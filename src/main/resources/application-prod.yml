@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://db-prod:5432/enterprise_shop
+    username: shop_prod
+    password: STRONG_PROD_PASSWORD
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: 3600000
+    refresh-expiration: 86400000
+
+logging:
+  level:
+    root: WARN
