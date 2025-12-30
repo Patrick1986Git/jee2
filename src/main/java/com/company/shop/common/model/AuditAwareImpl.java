@@ -1,10 +1,10 @@
 package com.company.shop.common.model;
 
+import java.util.Optional;
+
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-
-import java.util.Optional;
 
 public class AuditAwareImpl implements AuditorAware<String> {
 

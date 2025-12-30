@@ -1,9 +1,13 @@
 package com.company.shop.common.model;
 
-import jakarta.persistence.*;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.MappedSuperclass;
 
 @MappedSuperclass
 public abstract class BaseEntity implements Serializable {

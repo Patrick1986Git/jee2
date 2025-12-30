@@ -22,6 +22,6 @@ spring:
 
 security:
   jwt:
-    secret: DEV_SUPER_SECRET_KEY_CHANGE_ME
+    secret: ToJestBardzoDlugiIKompleksowyKluczDoZabezpieczeniaTokenowJWT123!
     expiration: 3600000 # 1h
     refresh-expiration: 86400000 # 24h

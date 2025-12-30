@@ -1,7 +1,10 @@
 package com.company.shop.module.user.entity;
 
 import com.company.shop.common.model.BaseEntity;
-import jakarta.persistence.*;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "roles")

@@ -1,10 +1,11 @@
 package com.company.shop.module.user.repository;
 
-import com.company.shop.module.user.entity.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.company.shop.module.user.entity.User;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
 
