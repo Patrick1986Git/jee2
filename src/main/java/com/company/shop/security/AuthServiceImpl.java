@@ -46,21 +46,18 @@ public class AuthServiceImpl implements AuthService {
 	@Override
 	public void register(RegisterRequestDTO request) {
 
-	    if (userRepository.existsByEmail(request.getEmail())) {
-	        throw new IllegalArgumentException("Email already exists");
-	    }
+		if (userRepository.existsByEmail(request.getEmail())) {
+			throw new IllegalArgumentException("Email already exists");
+		}
 
-	    User user = new User(
-	        request.getEmail(),
-	        passwordEncoder.encode(request.getPassword())
-	    );
+		User user = new User(request.getEmail(), passwordEncoder.encode(request.getPassword()));
 
-	    Role userRole = roleRepository.findByName("ROLE_USER")
-	        .orElseThrow(() -> new IllegalStateException("ROLE_USER not found"));
+		Role userRole = roleRepository.findByName("ROLE_USER")
+				.orElseThrow(() -> new IllegalStateException("ROLE_USER not found"));
 
-	    user.addRole(userRole);
+		user.addRole(userRole);
 
-	    userRepository.save(user);
+		userRepository.save(user);
 	}
 
 }
