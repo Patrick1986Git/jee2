@@ -3,6 +3,8 @@ package com.company.shop.module.user.entity;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.hibernate.annotations.SQLRestriction;
+
 import com.company.shop.common.model.SoftDeleteEntity;
 
 import jakarta.persistence.Column;
@@ -15,6 +17,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "users")
+@SQLRestriction("deleted = false")
 public class User extends SoftDeleteEntity {
 
     @Column(name = "email", nullable = false, unique = true, length = 255)
@@ -44,12 +47,13 @@ public class User extends SoftDeleteEntity {
         // JPA
     }
 
-    public User(String email, String encodedPassword) {
+    public User(String email, String encodedPassword, String firstName, String lastName) {
         this.email = email;
         this.password = encodedPassword;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.enabled = true;
     }
-    // ===== GETTERS =====
 
     public String getEmail() {
         return email;
@@ -66,15 +70,23 @@ public class User extends SoftDeleteEntity {
     public String getFirstName() {
         return firstName;
     }
+    
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
 
     public String getLastName() {
         return lastName;
     }
 
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+    
     public Set<Role> getRoles() {
         return roles;
     }
-
+    
     // ===== BUSINESS METHODS =====
 
     public void addRole(Role role) {

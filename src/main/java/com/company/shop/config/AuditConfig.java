@@ -8,7 +8,7 @@ import com.company.shop.common.model.AuditAwareImpl;
 
 @Configuration
 @EnableJpaAuditing(auditorAwareRef = "auditorProvider")
-public class AppConfig {
+public class AuditConfig {
 
 	@Bean
 	public AuditAwareImpl auditorProvider() {

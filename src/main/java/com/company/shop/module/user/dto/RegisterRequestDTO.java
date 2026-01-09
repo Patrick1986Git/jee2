@@ -1,9 +1,11 @@
 package com.company.shop.module.user.dto;
 
+import com.company.shop.validation.annotation.PasswordMatches;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+@PasswordMatches // Adnotacja sprawdzająca, czy hasła są identyczne
 public class RegisterRequestDTO {
 
 	@Email
@@ -13,6 +15,9 @@ public class RegisterRequestDTO {
 	@NotBlank
 	@Size(min = 8)
 	private String password;
+
+	@NotBlank
+	private String passwordRepeat;
 
 	@NotBlank
 	private String firstName;
@@ -26,6 +31,10 @@ public class RegisterRequestDTO {
 
 	public String getPassword() {
 		return password;
+	}
+
+	public String getPasswordRepeat() {
+		return passwordRepeat;
 	}
 
 	public String getFirstName() {
