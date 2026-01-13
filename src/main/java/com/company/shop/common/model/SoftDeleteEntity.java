@@ -18,9 +18,13 @@ public abstract class SoftDeleteEntity extends AuditableEntity {
 		return deleted;
 	}
 
-	public void markDeleted() {
+	public void delete() {
 		this.deleted = true;
 		this.deletedAt = LocalDateTime.now();
+	}
+
+	public void markDeleted() {
+		this.delete();
 	}
 
 	public LocalDateTime getDeletedAt() {
