@@ -73,4 +73,12 @@ public class UserServiceImpl implements UserService {
 
 		user.markDeleted();
 	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public User getCurrentUserEntity() {
+		String email = SecurityContextHolder.getContext().getAuthentication().getName();
+		return repository.findByEmail(email)
+				.orElseThrow(() -> new EntityNotFoundException("Nie znaleziono użytkownika: " + email));
+	}
 }

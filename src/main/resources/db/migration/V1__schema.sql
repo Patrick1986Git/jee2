@@ -80,6 +80,7 @@ CREATE TABLE products (
     stock INT NOT NULL,
     category_id UUID NOT NULL,
 
+    -- Auditing & Soft Delete
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
     updated_at TIMESTAMP,
@@ -92,7 +93,6 @@ CREATE TABLE products (
 
 CREATE INDEX idx_products_sku ON products(sku);
 CREATE INDEX idx_products_slug ON products(slug);
-CREATE INDEX idx_products_category ON products(category_id);
 
 -- =========================================
 -- ORDERS
@@ -101,8 +101,16 @@ CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL,
     status VARCHAR(50) NOT NULL,
-    total_price NUMERIC(12,2) NOT NULL,
+    total_amount NUMERIC(12,2) NOT NULL, -- Zmienione z total_price na total_amount
+
+    -- Auditing & Soft Delete (Wymagane przez SoftDeleteEntity)
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    updated_at TIMESTAMP,
+    updated_by VARCHAR(100),
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMP,
+
     CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -115,6 +123,15 @@ CREATE TABLE order_items (
     product_id UUID NOT NULL,
     quantity INT NOT NULL,
     price NUMERIC(12,2) NOT NULL,
+
+    -- Zakładając, że OrderItem też może dziedziczyć po SoftDeleteEntity w przyszłości:
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    updated_at TIMESTAMP,
+    updated_by VARCHAR(100),
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMP,
+
     CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id),
     CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products(id)
 );
@@ -128,7 +145,15 @@ CREATE TABLE payments (
     payment_method VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL,
     amount NUMERIC(12,2) NOT NULL,
+
+    -- Auditing & Soft Delete
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    updated_at TIMESTAMP,
+    updated_by VARCHAR(100),
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMP,
+
     CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders(id)
 );
 

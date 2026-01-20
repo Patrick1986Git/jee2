@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 
 import com.company.shop.module.user.dto.UserResponseDTO;
 import com.company.shop.module.user.dto.UserUpdateDTO;
+import com.company.shop.module.user.entity.User;
 
 public interface UserService {
 
@@ -19,4 +20,6 @@ public interface UserService {
 	UserResponseDTO update(UUID id, UserUpdateDTO dto);
 
 	void delete(UUID id);
+
+	User getCurrentUserEntity();
 }
