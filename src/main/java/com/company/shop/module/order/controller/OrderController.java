@@ -31,9 +31,6 @@ public class OrderController {
 		this.orderService = orderService;
 	}
 
-	/**
-	 * Składanie zamówienia. Dostępne dla każdego zalogowanego użytkownika.
-	 */
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	@PreAuthorize("isAuthenticated()")
@@ -41,24 +38,21 @@ public class OrderController {
 		return orderService.placeOrder(request);
 	}
 
-	/**
-	 * Pobieranie szczegółów konkretnego zamówienia. Logika wewnątrz serwisu powinna
-	 * sprawdzać, czy to zamówienie należy do usera lub czy user to ADMIN.
-	 */
 	@GetMapping("/{id}")
 	@PreAuthorize("isAuthenticated()")
 	public OrderResponseDTO getOrderById(@PathVariable UUID id) {
-		// Metoda do dodania w serwisie: return orderService.findById(id);
-		return null;
+		return orderService.findById(id); // Wywołuje metodę z weryfikacją właściciela
 	}
 
-	/**
-	 * Endpoint dla administratora do przeglądania wszystkich zamówień w systemie.
-	 */
+	@GetMapping("/my")
+	@PreAuthorize("isAuthenticated()")
+	public Page<OrderResponseDTO> getMyOrders(@PageableDefault(size = 10) Pageable pageable) {
+		return orderService.findMyOrders(pageable);
+	}
+
 	@GetMapping("/admin/all")
 	@PreAuthorize("hasRole('ADMIN')")
 	public Page<OrderResponseDTO> getAllOrders(@PageableDefault(size = 20) Pageable pageable) {
-		// Metoda do dodania w serwisie: return orderService.findAll(pageable);
-		return null;
+		return orderService.findAll(pageable);
 	}
 }

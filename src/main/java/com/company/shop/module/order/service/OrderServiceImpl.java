@@ -1,7 +1,11 @@
 package com.company.shop.module.order.service;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +30,7 @@ public class OrderServiceImpl implements OrderService {
 
 	private final OrderRepository orderRepo;
 	private final ProductRepository productRepo;
-	private final PaymentRepository paymentRepo; // Dodane!
+	private final PaymentRepository paymentRepo;
 	private final UserService userService;
 	private final OrderMapper mapper;
 
@@ -40,12 +44,44 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
+	public OrderResponseDTO findById(UUID id) {
+		Order order = orderRepo.findById(id).orElseThrow(() -> new EntityNotFoundException("Zamówienie nie istnieje"));
+
+		User currentUser = userService.getCurrentUserEntity();
+
+		// MECHANIZM SECURITY: Sprawdzamy czy użytkownik jest właścicielem zamówienia
+		// ALBO czy posiada rolę ADMIN
+		boolean isAdmin = currentUser.getRoles().stream().anyMatch(role -> role.getName().equals("ROLE_ADMIN"));
+
+		boolean isOwner = order.getUser().getId().equals(currentUser.getId());
+
+		if (!isAdmin && !isOwner) {
+			throw new AccessDeniedException("Nie masz uprawnień do podglądu tego zamówienia");
+		}
+
+		return mapper.toDto(order);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Page<OrderResponseDTO> findAll(Pageable pageable) {
+		// Ta metoda jest przeznaczona dla Admina (zabezpieczona w kontrolerze)
+		return orderRepo.findAll(pageable).map(mapper::toDto);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Page<OrderResponseDTO> findMyOrders(Pageable pageable) {
+		User currentUser = userService.getCurrentUserEntity();
+
+		return orderRepo.findByUser(currentUser, pageable).map(mapper::toDto);
+	}
+
+	@Override
 	@Transactional
 	public OrderResponseDTO placeOrder(OrderCreateRequestDTO request) {
-
 		User user = userService.getCurrentUserEntity();
-
-		// Tworzenie szkieletu zamówienia
 		Order order = new Order(user, BigDecimal.ZERO);
 		BigDecimal total = BigDecimal.ZERO;
 
@@ -57,24 +93,17 @@ public class OrderServiceImpl implements OrderService {
 				throw new IllegalStateException("Niewystarczająca ilość produktu: " + product.getName());
 			}
 
-			// Aktualizacja stanu magazynowego
 			product.updateStock(product.getStock() - itemRequest.getQuantity());
 
-			// Tworzenie pozycji zamówienia z ceną z MOMENTU zakupu
 			BigDecimal priceAtPurchase = product.getPrice();
-			BigDecimal itemTotal = priceAtPurchase.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
-			total = total.add(itemTotal);
+			total = total.add(priceAtPurchase.multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
 
 			order.addItem(new OrderItem(product, itemRequest.getQuantity(), priceAtPurchase));
 		}
 
-		// Ustawienie finalnej kwoty (Order powinien mieć setter lub metodę update)
-
 		order.setTotalAmount(total);
-
 		Order savedOrder = orderRepo.save(order);
 
-		// Inicjacja płatności
 		Payment payment = new Payment(savedOrder, "STRIPE", total);
 		paymentRepo.save(payment);
 
