@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.company.shop.module.order.dto.OrderCreateRequestDTO;
+import com.company.shop.module.order.dto.OrderDetailedResponseDTO;
 import com.company.shop.module.order.dto.OrderResponseDTO;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderItem;
@@ -45,22 +46,19 @@ public class OrderServiceImpl implements OrderService {
 
 	@Override
 	@Transactional(readOnly = true)
-	public OrderResponseDTO findById(UUID id) {
+	public OrderDetailedResponseDTO findById(UUID id) {
 		Order order = orderRepo.findById(id).orElseThrow(() -> new EntityNotFoundException("Zamówienie nie istnieje"));
 
 		User currentUser = userService.getCurrentUserEntity();
 
-		// MECHANIZM SECURITY: Sprawdzamy czy użytkownik jest właścicielem zamówienia
-		// ALBO czy posiada rolę ADMIN
 		boolean isAdmin = currentUser.getRoles().stream().anyMatch(role -> role.getName().equals("ROLE_ADMIN"));
-
 		boolean isOwner = order.getUser().getId().equals(currentUser.getId());
 
 		if (!isAdmin && !isOwner) {
-			throw new AccessDeniedException("Nie masz uprawnień do podglądu tego zamówienia");
+			throw new AccessDeniedException("Brak uprawnień do podglądu zamówienia");
 		}
 
-		return mapper.toDto(order);
+		return mapper.toDetailedDto(order);
 	}
 
 	@Override

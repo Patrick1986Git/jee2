@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.company.shop.module.order.dto.OrderCreateRequestDTO;
+import com.company.shop.module.order.dto.OrderDetailedResponseDTO;
 import com.company.shop.module.order.dto.OrderResponseDTO;
 import com.company.shop.module.order.service.OrderService;
 
@@ -40,7 +41,7 @@ public class OrderController {
 
 	@GetMapping("/{id}")
 	@PreAuthorize("isAuthenticated()")
-	public OrderResponseDTO getOrderById(@PathVariable UUID id) {
+	public OrderDetailedResponseDTO getOrderById(@PathVariable UUID id) {
 		return orderService.findById(id); // Wywołuje metodę z weryfikacją właściciela
 	}
 
