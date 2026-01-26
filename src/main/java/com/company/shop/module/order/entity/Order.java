@@ -48,6 +48,13 @@ public class Order extends SoftDeleteEntity {
 		this.status = OrderStatus.NEW;
 	}
 
+	public void markAsPaid() {
+		if (this.status != OrderStatus.NEW) {
+			throw new IllegalStateException("Only NEW orders can be marked as PAID");
+		}
+		this.status = OrderStatus.PAID;
+	}
+
 	public void addItem(OrderItem item) {
 		items.add(item);
 		item.setOrder(this); // Kluczowe dla Hibernate!
@@ -68,9 +75,13 @@ public class Order extends SoftDeleteEntity {
 	public List<OrderItem> getItems() {
 		return items;
 	}
-	
+
 	public void setTotalAmount(BigDecimal totalAmount) {
-	    this.totalAmount = totalAmount;
+		this.totalAmount = totalAmount;
+	}
+
+	public void setStatus(OrderStatus status) {
+		this.status = status;
 	}
 
 }

@@ -6,5 +6,10 @@ import java.util.UUID;
 
 import com.company.shop.module.order.entity.OrderStatus;
 
-public record OrderResponseDTO(UUID id, OrderStatus status, BigDecimal totalAmount, LocalDateTime createdAt) {
-}
+public record OrderResponseDTO(
+		UUID id, 
+		OrderStatus status, 
+		BigDecimal totalAmount, 
+		LocalDateTime createdAt,
+		PaymentIntentResponseDTO paymentInfo
+) {}

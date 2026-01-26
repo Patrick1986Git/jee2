@@ -40,3 +40,7 @@ management:
     web:
       exposure:
         include: health,info
+
+stripe:
+  api-key: ${STRIPE_SECRET_KEY:sk_test_twój_klucz}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_twój_klucz}

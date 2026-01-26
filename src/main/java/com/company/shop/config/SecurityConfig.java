@@ -30,7 +30,9 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtFilter;
     private final UserDetailsServiceImpl userDetailsService;
 
-    // Konstruktor nadal wstrzykuje obie zależności
+    private static final String WEBHOOKS_URL = "/api/webhooks/**";
+    private static final String ADMIN_URL = "/admin/**";
+
     public SecurityConfig(JwtAuthenticationFilter jwtFilter,
                           UserDetailsServiceImpl userDetailsService) {
         this.jwtFilter = jwtFilter;
@@ -39,20 +41,23 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
         http
             .cors(Customizer.withDefaults())
-            .csrf(csrf -> csrf.disable())		
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))	// Kluczowe dla JWT: Brak sesji po stronie serwera        
-            .userDetailsService(userDetailsService)		// Rejestrujemy serwis do obsługi logowania (hasło + login)
-            .authorizeHttpRequests(auth -> auth
-                    .requestMatchers(SecurityConstants.PUBLIC_ENDPOINTS).permitAll()
-                    .requestMatchers("/admin/**").hasRole("ADMIN")
-                    .anyRequest().authenticated()
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers(WEBHOOKS_URL)
             )
-            .formLogin(form -> form.disable())
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(WEBHOOKS_URL).permitAll() // Publiczne webhooki (np. Stripe, PayPal)
+                .requestMatchers(SecurityConstants.PUBLIC_ENDPOINTS).permitAll()
+                .requestMatchers(ADMIN_URL).hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )   
+            .formLogin(form -> form.disable())	// Wyłączenie domyślnych mechanizmów logowania (używamy JWT)
             .httpBasic(basic -> basic.disable())
-            // Dodajemy Twój zoptymalizowany filtr JWT
+            .userDetailsService(userDetailsService)	// Integracja UserDetailsService i filtra JWT
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -62,6 +67,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
+        // W środowisku produkcyjnym te wartości powinny pochodzić z @Value lub pliku .yml
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000", 
                 "http://localhost:8080"

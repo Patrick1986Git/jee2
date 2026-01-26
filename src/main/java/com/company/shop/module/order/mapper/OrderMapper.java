@@ -17,6 +17,8 @@ public interface OrderMapper {
 	OrderResponseDTO toDto(Order order);
 
 	@Mapping(target = "userEmail", source = "user.email")
+	// W trakcie mvn clean install wyskakuje WARNING opaymentInfo. Aby usunąć je z ostrzeżeń to odkomentować Mapping:
+	// @Mapping(target = "paymentInfo", ignore = true)
 	OrderDetailedResponseDTO toDetailedDto(Order order);
 
 	@Mapping(target = "productId", source = "product.id")
@@ -26,6 +28,8 @@ public interface OrderMapper {
 	OrderItemResponseDTO toItemDto(OrderItem item);
 
 	default BigDecimal calculateSubtotal(OrderItem item) {
+		if (item == null || item.getPrice() == null)
+			return BigDecimal.ZERO;
 		return item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
 	}
 }

@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.company.shop.module.order.dto.OrderCreateRequestDTO;
 import com.company.shop.module.order.dto.OrderDetailedResponseDTO;
 import com.company.shop.module.order.dto.OrderResponseDTO;
+import com.company.shop.module.order.dto.PaymentIntentResponseDTO;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderItem;
 import com.company.shop.module.order.entity.Payment;
@@ -29,20 +30,23 @@ import jakarta.persistence.EntityNotFoundException;
 @Transactional
 public class OrderServiceImpl implements OrderService {
 
-	private final OrderRepository orderRepo;
-	private final ProductRepository productRepo;
-	private final PaymentRepository paymentRepo;
-	private final UserService userService;
-	private final OrderMapper mapper;
+    private final OrderRepository orderRepo;
+    private final ProductRepository productRepo;
+    private final PaymentRepository paymentRepo;
+    private final UserService userService;
+    private final OrderMapper mapper;
+    private final PaymentService paymentService;
 
-	public OrderServiceImpl(OrderRepository orderRepo, ProductRepository productRepo, PaymentRepository paymentRepo,
-			UserService userService, OrderMapper mapper) {
-		this.orderRepo = orderRepo;
-		this.productRepo = productRepo;
-		this.paymentRepo = paymentRepo;
-		this.userService = userService;
-		this.mapper = mapper;
-	}
+    public OrderServiceImpl(OrderRepository orderRepo, ProductRepository productRepo, 
+                            PaymentRepository paymentRepo, UserService userService, 
+                            OrderMapper mapper, PaymentService paymentService) {
+        this.orderRepo = orderRepo;
+        this.productRepo = productRepo;
+        this.paymentRepo = paymentRepo;
+        this.userService = userService;
+        this.mapper = mapper;
+        this.paymentService = paymentService;
+    }
 
 	@Override
 	@Transactional(readOnly = true)
@@ -77,34 +81,47 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	@Override
-	@Transactional
-	public OrderResponseDTO placeOrder(OrderCreateRequestDTO request) {
-		User user = userService.getCurrentUserEntity();
-		Order order = new Order(user, BigDecimal.ZERO);
-		BigDecimal total = BigDecimal.ZERO;
+    @Transactional
+    public OrderResponseDTO placeOrder(OrderCreateRequestDTO request) {
+        User user = userService.getCurrentUserEntity();
+        Order order = new Order(user, BigDecimal.ZERO);
+        BigDecimal total = BigDecimal.ZERO;
 
-		for (var itemRequest : request.getItems()) {
-			Product product = productRepo.findById(itemRequest.getProductId()).orElseThrow(
-					() -> new EntityNotFoundException("Produkt nie istnieje: " + itemRequest.getProductId()));
+        for (var itemRequest : request.getItems()) {
+            Product product = productRepo.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new EntityNotFoundException("Produkt nie istnieje"));
 
-			if (product.getStock() < itemRequest.getQuantity()) {
-				throw new IllegalStateException("Niewystarczająca ilość produktu: " + product.getName());
-			}
+            if (product.getStock() < itemRequest.getQuantity()) {
+                throw new IllegalStateException("Brak towaru: " + product.getName());
+            }
 
-			product.updateStock(product.getStock() - itemRequest.getQuantity());
+            product.updateStock(product.getStock() - itemRequest.getQuantity());
+            BigDecimal priceAtPurchase = product.getPrice();
+            total = total.add(priceAtPurchase.multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
 
-			BigDecimal priceAtPurchase = product.getPrice();
-			total = total.add(priceAtPurchase.multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
+            order.addItem(new OrderItem(product, itemRequest.getQuantity(), priceAtPurchase));
+        }
 
-			order.addItem(new OrderItem(product, itemRequest.getQuantity(), priceAtPurchase));
-		}
+        order.setTotalAmount(total);
+        Order savedOrder = orderRepo.save(order);
 
-		order.setTotalAmount(total);
-		Order savedOrder = orderRepo.save(order);
+        // Zapisujemy ślad płatności w naszej bazie
+        Payment payment = new Payment(savedOrder, "STRIPE", total);
+        paymentRepo.save(payment);
 
-		Payment payment = new Payment(savedOrder, "STRIPE", total);
-		paymentRepo.save(payment);
+        // Generujemy PaymentIntent w Stripe
+        PaymentIntentResponseDTO stripeInfo = paymentService.createPaymentIntent(savedOrder);
 
-		return mapper.toDto(savedOrder);
-	}
+        // Mapujemy do DTO i ręcznie dołączamy stripeInfo (bo mapper go nie zna)
+        OrderResponseDTO response = mapper.toDto(savedOrder);
+        
+        // Zwracamy nowy rekord z informacjami płatności
+        return new OrderResponseDTO(
+            response.id(), 
+            response.status(), 
+            response.totalAmount(), 
+            response.createdAt(), 
+            stripeInfo
+        );
+    }
 }
