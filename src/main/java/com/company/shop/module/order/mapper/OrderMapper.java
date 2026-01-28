@@ -17,7 +17,7 @@ public interface OrderMapper {
 	OrderResponseDTO toDto(Order order);
 
 	@Mapping(target = "userEmail", source = "user.email")
-	// W trakcie mvn clean install wyskakuje WARNING opaymentInfo. Aby usunąć je z ostrzeżeń to odkomentować Mapping:
+	// W trakcie mvn clean install wyskakuje WARNING paymentInfo. Aby usunąć je z ostrzeżeń to odkomentować @Mapping
 	// @Mapping(target = "paymentInfo", ignore = true)
 	OrderDetailedResponseDTO toDetailedDto(Order order);
 
