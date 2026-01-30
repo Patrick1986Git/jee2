@@ -12,12 +12,13 @@ public class ProductResponseDTO {
 	private final String description;
 	private final BigDecimal price;
 	private final int stock;
-
-	private final UUID categoryId; // Dane kategorii spłaszczone do ID i nazwy (Flattening)
+	private final UUID categoryId;
 	private final String categoryName;
+	private final Double averageRating;
+	private final int reviewCount;
 
 	public ProductResponseDTO(UUID id, String name, String slug, String sku, String description, BigDecimal price,
-			int stock, UUID categoryId, String categoryName) {
+			int stock, UUID categoryId, String categoryName, Double averageRating, int reviewCount) {
 		this.id = id;
 		this.name = name;
 		this.slug = slug;
@@ -27,6 +28,8 @@ public class ProductResponseDTO {
 		this.stock = stock;
 		this.categoryId = categoryId;
 		this.categoryName = categoryName;
+		this.averageRating = averageRating != null ? averageRating : 0.0;
+		this.reviewCount = reviewCount;
 	}
 
 	public UUID getId() {
@@ -63,5 +66,13 @@ public class ProductResponseDTO {
 
 	public String getCategoryName() {
 		return categoryName;
+	}
+
+	public Double getAverageRating() {
+		return averageRating;
+	}
+
+	public int getReviewCount() {
+		return reviewCount;
 	}
 }

@@ -23,10 +23,10 @@ public class Product extends SoftDeleteEntity {
 	private String name;
 
 	@Column(nullable = false, unique = true, length = 255)
-	private String slug; // Dla SEO: /products/laptop-dell-xps-13
+	private String slug;
 
 	@Column(nullable = false, unique = true, length = 50)
-	private String sku; // Stock Keeping Unit - unikalny kod produktu (np. DELL-XPS-13-2026)
+	private String sku;
 
 	@Column(columnDefinition = "TEXT")
 	private String description;
@@ -41,6 +41,12 @@ public class Product extends SoftDeleteEntity {
 	@JoinColumn(name = "category_id")
 	private Category category;
 
+	@Column(name = "average_rating", nullable = false, columnDefinition = "NUMERIC(3,2)")
+	private Double averageRating = 0.0;
+
+	@Column(name = "review_count", nullable = false)
+	private int reviewCount = 0;
+
 	protected Product() {
 		// JPA
 	}
@@ -54,6 +60,20 @@ public class Product extends SoftDeleteEntity {
 		this.price = price;
 		this.stock = stock;
 		this.category = category;
+		this.averageRating = 0.0;
+		this.reviewCount = 0;
+	}
+
+	/**
+	 * Logika biznesowa aktualizacji statystyk recenzji. Metoda ta powinna być
+	 * wywoływana przez serwis po dodaniu/usunięciu recenzji.
+	 */
+	public void updateRatings(Double newAverage, int newCount) {
+		if (newCount < 0) {
+			throw new IllegalArgumentException("Liczba recenzji nie może być ujemna");
+		}
+		this.averageRating = newAverage;
+		this.reviewCount = newCount;
 	}
 
 	public void update(String name, String slug, String description, BigDecimal price, int stock, Category category) {
@@ -98,5 +118,13 @@ public class Product extends SoftDeleteEntity {
 
 	public Category getCategory() {
 		return category;
+	}
+
+	public Double getAverageRating() {
+		return averageRating;
+	}
+
+	public int getReviewCount() {
+		return reviewCount;
 	}
 }
