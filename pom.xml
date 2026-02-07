@@ -172,6 +172,7 @@
 				<configuration>
 					<source>${java.version}</source>
 					<target>${java.version}</target>
+					<generatedSourcesDirectory>${project.build.directory}/generated-sources/annotations</generatedSourcesDirectory>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.mapstruct</groupId>
