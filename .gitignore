@@ -1,0 +1,56 @@
+###############################################################################
+# ENTERPRISE SHOP - GIT IGNORE CONFIGURATION
+# Standard exclusions for Java/Maven projects using Eclipse and IntelliJ.
+###############################################################################
+
+# --- Build Artifacts ---
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# --- Compiled Classes ---
+*.class
+
+# --- Logs & Temp Files ---
+*.log
+logs/
+temp/
+tmp/
+
+# --- Eclipse IDE ---
+.metadata/
+.classpath
+.project
+.settings/
+*.launch
+bin/
+.externalToolBuilders/
+.factorypath
+
+# --- IntelliJ IDEA ---
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+cmake-build-debug/
+
+# --- VS Code ---
+.vscode/
+
+# --- Operating System Files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Docker & Environment ---
+.env
+.env.local
+docker-compose.override.yml
