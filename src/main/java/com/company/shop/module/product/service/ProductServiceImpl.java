@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2026 Your Company Name. All rights reserved.
+ *
+ * This software is the confidential and proprietary information of Your Company Name.
+ * You shall not disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into with Your Company.
+ */
+
 package com.company.shop.module.product.service;
 
 import java.text.Normalizer;
@@ -14,12 +22,24 @@ import com.company.shop.module.category.entity.Category;
 import com.company.shop.module.category.repository.CategoryRepository;
 import com.company.shop.module.product.dto.ProductCreateDTO;
 import com.company.shop.module.product.dto.ProductResponseDTO;
+import com.company.shop.module.product.dto.ProductSearchCriteria;
 import com.company.shop.module.product.entity.Product;
 import com.company.shop.module.product.mapper.ProductMapper;
 import com.company.shop.module.product.repository.ProductRepository;
+import com.company.shop.module.product.specification.ProductSpecification;
 
 import jakarta.persistence.EntityNotFoundException;
 
+/**
+ * Production-grade implementation of the {@link ProductService}.
+ * <p>
+ * This service manages the product catalog, handling SEO-friendly slug generation,
+ * stock management, and complex search operations using JPA Specifications.
+ * All write operations are transactional.
+ * </p>
+ *
+ * @since 1.0.0
+ */
 @Service
 @Transactional
 public class ProductServiceImpl implements ProductService {
@@ -56,7 +76,7 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponseDTO findById(UUID id) {
         return productRepo.findById(id)
                 .map(mapper::toDto)
-                .orElseThrow(() -> new EntityNotFoundException("Produkt o podanym ID nie istnieje"));
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + id));
     }
 
     @Override
@@ -64,27 +84,30 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponseDTO findBySlug(String slug) {
         return productRepo.findBySlug(slug)
                 .map(mapper::toDto)
-                .orElseThrow(() -> new EntityNotFoundException("Produkt o slugu " + slug + " nie istnieje"));
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with slug: " + slug));
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Implementation generates a unique slug based on the product name and validates
+     * SKU uniqueness before persisting.
+     * </p>
+     */
     @Override
     public ProductResponseDTO create(ProductCreateDTO dto) {
-        // 1. Walidacja unikalności SKU (Klucz biznesowy)
         if (productRepo.existsBySku(dto.getSku())) {
-            throw new IllegalArgumentException("Produkt z kodem SKU " + dto.getSku() + " już istnieje");
+            throw new IllegalArgumentException("Product with SKU " + dto.getSku() + " already exists");
         }
 
-        // 2. Pobranie kategorii
         Category category = categoryRepo.findById(dto.getCategoryId())
-                .orElseThrow(() -> new EntityNotFoundException("Nie znaleziono kategorii o ID: " + dto.getCategoryId()));
+                .orElseThrow(() -> new EntityNotFoundException("Category not found with ID: " + dto.getCategoryId()));
 
-        // 3. Generowanie unikalnego sluga
         String slug = generateSlug(dto.getName());
         if (productRepo.existsBySlug(slug)) {
             slug = slug + "-" + UUID.randomUUID().toString().substring(0, 5);
         }
 
-        // 4. Tworzenie encji (zgodnie z Twoim nowym konstruktorem)
         Product product = new Product(
                 dto.getName(),
                 slug,
@@ -101,12 +124,11 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductResponseDTO update(UUID id, ProductCreateDTO dto) {
         Product product = productRepo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Nie można zaktualizować. Produkt nie istnieje."));
+                .orElseThrow(() -> new EntityNotFoundException("Update failed. Product not found."));
 
         Category category = categoryRepo.findById(dto.getCategoryId())
-                .orElseThrow(() -> new EntityNotFoundException("Nie znaleziono kategorii"));
+                .orElseThrow(() -> new EntityNotFoundException("Category not found"));
 
-        // Aktualizacja danych biznesowych
         String newSlug = generateSlug(dto.getName());
         product.update(dto.getName(), newSlug, dto.getDescription(), dto.getPrice(), dto.getStock(), category);
 
@@ -116,14 +138,38 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public void delete(UUID id) {
         Product product = productRepo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Produkt nie znaleziony"));
-        product.delete(); // Soft Delete
+                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
+        product.delete();
     }
 
+    /**
+     * Generates an SEO-friendly slug from the provided input string.
+     * <p>
+     * Replaces whitespaces with hyphens, removes non-latin characters,
+     * and normalizes Polish diacritics.
+     * </p>
+     *
+     * @param input the string to slugify (e.g., product name).
+     * @return a lower-case, URL-safe string.
+     */
     private String generateSlug(String input) {
         String nowhitespace = WHITESPACE.matcher(input).replaceAll("-");
         String normalized = Normalizer.normalize(nowhitespace, Normalizer.Form.NFD);
         String slug = NONLATIN.matcher(normalized).replaceAll("");
         return slug.toLowerCase(Locale.ENGLISH);
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Utilizes {@link ProductSpecification} to build dynamic queries based on
+     * full-text search and other filters.
+     * </p>
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductResponseDTO> searchProducts(ProductSearchCriteria criteria, Pageable pageable) {
+        return productRepo.findAll(ProductSpecification.filterByCriteria(criteria), pageable)
+                .map(mapper::toDto);
     }
 }
