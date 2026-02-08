@@ -1,0 +1,37 @@
+###############################################################################
+# ENTERPRISE SHOP - DOCKER INFRASTRUCTURE CONFIGURATION
+# This file manages local development services (PostgreSQL, Redis, etc.)
+# Usage: docker-compose up -d
+###############################################################################
+
+services:
+  # Database Service: PostgreSQL with Polish FTS support
+  # Note: The custom build context is used to include Polish dictionaries
+  postgres:
+    build: ./docker/postgres
+    container_name: enterprise-shop-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      # Standard dev credentials - DO NOT use these in production environments
+      - POSTGRES_DB=enterprise_shop_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d enterprise_shop_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - shop-network
+
+networks:
+  shop-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: enterprise_shop_postgres_volume
