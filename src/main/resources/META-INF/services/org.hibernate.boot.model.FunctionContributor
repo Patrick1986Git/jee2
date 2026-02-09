@@ -1,0 +1,8 @@
+# #############################################################################
+# HIBERNATE SERVICE PROVIDER CONFIGURATION
+# This file registers custom function contributors to the Hibernate engine.
+# 
+# Registered: SqlFunctionsContributor - adds PostgreSQL FTS (@@) support.
+# #############################################################################
+
+com.company.shop.config.SqlFunctionsContributor
