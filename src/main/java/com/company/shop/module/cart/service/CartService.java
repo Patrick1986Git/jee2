@@ -13,13 +13,14 @@ import java.util.UUID;
 import com.company.shop.module.cart.dto.AddToCartRequestDTO;
 import com.company.shop.module.cart.dto.CartResponseDTO;
 import com.company.shop.module.cart.dto.UpdateCartItemRequestDTO;
+import com.company.shop.module.cart.entity.Cart;
 
 /**
- * Service interface for managing shopping cart operations.
+ * Service interface for managing shopping cart lifecycle and business operations.
  * <p>
- * This service handles business logic for user-specific carts, including 
- * item persistence, quantity management, and cart lifecycle. All operations 
- * are performed within the context of the currently authenticated user.
+ * This service acts as the primary entry point for cart-related logic, providing
+ * both DTO-based responses for the Web API and direct entity access for 
+ * inter-module communication (e.g., during the Checkout process).
  * </p>
  *
  * @since 1.0.0
@@ -27,55 +28,55 @@ import com.company.shop.module.cart.dto.UpdateCartItemRequestDTO;
 public interface CartService {
 
     /**
-     * Retrieves the shopping cart for the currently authenticated user.
-     * <p>
-     * If a cart does not exist for the user, a new one may be initialized 
-     * depending on the implementation.
-     * </p>
+     * Retrieves the shopping cart DTO for the currently authenticated user.
      *
-     * @return a {@link CartResponseDTO} containing all cart items and totals.
+     * @return a {@link CartResponseDTO} enriched with calculated totals and product details.
      */
     CartResponseDTO getMyCart();
 
     /**
-     * Adds a product to the user's cart.
-     * <p>
-     * If the product is already present in the cart, the quantity will be increased.
-     * Validates product existence and stock availability before addition.
-     * </p>
+     * Adds a product to the user's cart with stock availability validation.
      *
-     * @param request DTO containing product identifier and quantity.
+     * @param request DTO containing product identifier and desired quantity.
      * @return the updated {@link CartResponseDTO}.
      */
     CartResponseDTO addToCart(AddToCartRequestDTO request);
 
     /**
-     * Updates the quantity of an existing item in the cart.
-     * <p>
-     * Performs boundary checks to ensure the requested quantity is valid 
-     * and available in stock.
-     * </p>
+     * Updates the quantity of an existing line item in the cart.
      *
-     * @param productId unique identifier of the product in the cart.
+     * @param productId unique identifier of the product to update.
      * @param request   DTO containing the new absolute quantity.
      * @return the updated {@link CartResponseDTO}.
      */
     CartResponseDTO updateItemQuantity(UUID productId, UpdateCartItemRequestDTO request);
 
     /**
-     * Removes a specific product from the user's cart regardless of its quantity.
+     * Completely removes a product from the user's shopping cart.
      *
-     * @param productId unique identifier of the product to remove.
+     * @param productId unique identifier of the product to be removed.
      * @return the updated {@link CartResponseDTO} after removal.
      */
     CartResponseDTO removeItem(UUID productId);
 
     /**
-     * Clears all items from the current user's cart.
+     * Purges all items from the current user's cart.
      * <p>
-     * This operation is typically performed after a successful order placement 
-     * or upon explicit user request.
+     * Typically invoked after a successful order placement or manual cart reset.
      * </p>
      */
     void clearCart();
+
+    /**
+     * Retrieves the raw {@link Cart} entity associated with a specific user.
+     * <p>
+     * <strong>Note:</strong> This method is intended for internal use by other modules 
+     * (e.g., Order Module) to process the cart within a single transaction. 
+     * It should not be exposed directly to the REST controller.
+     * </p>
+     *
+     * @param userId unique identifier of the user.
+     * @return the {@link Cart} entity, either existing or newly initialized.
+     */
+    Cart getCartEntityForUser(UUID userId);
 }
