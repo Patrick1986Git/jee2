@@ -20,11 +20,11 @@ import com.company.shop.module.cart.entity.Cart;
 import com.company.shop.module.cart.entity.CartItem;
 
 /**
- * Mapper component for converting Cart-related entities to Data Transfer Objects.
+ * Enterprise-grade mapper for shopping cart transformations.
  * <p>
- * This mapper leverages MapStruct to handle complex object graphs and perform 
- * real-time business calculations like subtotals and stock availability checks 
- * during the transformation process.
+ * This component handles the complex conversion between domain entities ({@link Cart}, {@link CartItem})
+ * and their corresponding Data Transfer Objects. It includes real-time business calculations
+ * and stock availability indicators.
  * </p>
  *
  * @since 1.0.0
@@ -38,10 +38,14 @@ public interface CartMapper {
     int LOW_STOCK_THRESHOLD = 5;
 
     /**
-     * Transforms a {@link Cart} aggregate root into a comprehensive {@link CartResponseDTO}.
+     * Maps a {@link Cart} entity to a {@link CartResponseDTO}.
+     * <p>
+     * Calculated fields like {@code totalAmount} and {@code totalItemsCount} are 
+     * derived using expression-based mapping.
+     * </p>
      *
-     * @param cart the source entity containing cart items and user information.
-     * @return a flattened DTO with calculated totals and item details.
+     * @param cart the source cart entity.
+     * @return a comprehensive cart response DTO.
      */
     @Mapping(target = "items", source = "items")
     @Mapping(target = "totalAmount", expression = "java(cart.calculateTotalAmount())")
@@ -49,14 +53,14 @@ public interface CartMapper {
     CartResponseDTO toDTO(Cart cart);
 
     /**
-     * Maps a {@link CartItem} entity to its corresponding {@link CartItemResponseDTO}.
+     * Maps a {@link CartItem} entity to a {@link CartItemResponseDTO}.
      * <p>
-     * Performs mapping from nested Product attributes and invokes custom logic for 
-     * financial and inventory status calculations.
+     * Note: {@code mainImageUrl} is explicitly ignored here as it usually requires 
+     * specific resolution from an external media service or CDN provider.
      * </p>
      *
-     * @param item the source line item from the cart.
-     * @return a DTO enriched with product details and calculated subtotals.
+     * @param item the source cart item entity.
+     * @return a flattened cart item response DTO.
      */
     @Mapping(target = "productId", source = "product.id")
     @Mapping(target = "productName", source = "product.name")
@@ -65,13 +69,14 @@ public interface CartMapper {
     @Mapping(target = "stockAvailable", source = "product.stock")
     @Mapping(target = "subtotal", expression = "java(calculateSubtotal(item))")
     @Mapping(target = "isLowStock", source = "item", qualifiedByName = "checkLowStock")
+    @Mapping(target = "mainImageUrl", ignore = true) 
     CartItemResponseDTO toItemDTO(CartItem item);
 
     /**
-     * Custom calculation logic for line item subtotal.
+     * Calculates the subtotal for a single cart line item.
      *
-     * @param item the cart item to calculate for.
-     * @return unit price multiplied by quantity, or {@link BigDecimal#ZERO} if null.
+     * @param item the cart item source.
+     * @return the product price multiplied by quantity, or ZERO if data is incomplete.
      */
     @Named("calculateSubtotal")
     default BigDecimal calculateSubtotal(CartItem item) {
@@ -81,10 +86,10 @@ public interface CartMapper {
     }
 
     /**
-     * Business rule for evaluating low stock alerts.
+     * Evaluates if the current product stock is below the enterprise threshold.
      *
-     * @param item the cart item to check.
-     * @return true if product stock is below {@link #LOW_STOCK_THRESHOLD}.
+     * @param item the cart item source.
+     * @return true if stock level is critical.
      */
     @Named("checkLowStock")
     default boolean checkLowStock(CartItem item) {
