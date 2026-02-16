@@ -8,8 +8,6 @@
 
 package com.company.shop.module.order.service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -18,7 +16,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.company.shop.module.order.dto.OrderCreateRequestDTO;
+import com.company.shop.module.cart.entity.Cart;
+import com.company.shop.module.cart.entity.CartItem;
+import com.company.shop.module.cart.service.CartService;
+import com.company.shop.module.order.dto.OrderCheckoutRequestDTO;
 import com.company.shop.module.order.dto.OrderDetailedResponseDTO;
 import com.company.shop.module.order.dto.OrderResponseDTO;
 import com.company.shop.module.order.dto.PaymentIntentResponseDTO;
@@ -38,17 +39,20 @@ import com.company.shop.module.user.service.UserService;
 import jakarta.persistence.EntityNotFoundException;
 
 /**
- * Implementation of the {@link OrderService} providing business logic for order management.
+ * Production implementation of {@link OrderService} managing high-integrity transactional order placement.
  * <p>
- * This service handles the complete order lifecycle, including stock validation, 
- * discount application, and integration with payment gateways. 
- * All write operations are wrapped in a transaction to ensure data integrity.
+ * This implementation orchestrates complex business processes including:
+ * <ul>
+ * <li>Pessimistic locking of products to prevent overselling.</li>
+ * <li>Atomic conversion of shopping carts to formalized orders.</li>
+ * <li>Integration with external payment providers (Stripe).</li>
+ * <li>Validation of domain invariants and security-scoped order retrieval.</li>
+ * </ul>
  * </p>
  *
  * @since 1.0.0
  */
 @Service
-@Transactional
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepo;
@@ -56,14 +60,19 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentRepository paymentRepo;
     private final DiscountCodeRepository discountCodeRepo;
     private final UserService userService;
+    private final CartService cartService;
     private final OrderMapper mapper;
     private final PaymentService paymentService;
 
+    /**
+     * Constructs the service with comprehensive dependency injection.
+     */
     public OrderServiceImpl(OrderRepository orderRepo, 
                             ProductRepository productRepo, 
                             PaymentRepository paymentRepo,
                             DiscountCodeRepository discountCodeRepo,
                             UserService userService, 
+                            CartService cartService,
                             OrderMapper mapper, 
                             PaymentService paymentService) {
         this.orderRepo = orderRepo;
@@ -71,31 +80,95 @@ public class OrderServiceImpl implements OrderService {
         this.paymentRepo = paymentRepo;
         this.discountCodeRepo = discountCodeRepo;
         this.userService = userService;
+        this.cartService = cartService;
         this.mapper = mapper;
         this.paymentService = paymentService;
     }
 
     /**
-     * Retrieves detailed information about a specific order.
-     * * @param id the unique identifier of the order.
-     * @return the detailed order data transfer object.
-     * @throws EntityNotFoundException if the order does not exist.
-     * @throws AccessDeniedException if the current user is not authorized to view the order.
+     * Places an order from the user's current cart.
+     * <p>
+     * Operation is fully transactional. If payment intent creation fails or stock is 
+     * insufficient, the entire operation (including stock deduction) is rolled back.
+     * </p>
+     *
+     * @param request checkout details including optional discount codes.
+     * @return {@link OrderResponseDTO} enriched with Stripe payment intent data.
+     * @throws IllegalStateException if cart is empty.
+     * @throws EntityNotFoundException if products in cart are no longer available.
+     */
+    @Override
+    @Transactional
+    public OrderResponseDTO placeOrderFromCart(OrderCheckoutRequestDTO request) {
+        User user = userService.getCurrentUserEntity();
+        Cart cart = cartService.getCartEntityForUser(user.getId());
+
+        if (cart.getItems().isEmpty()) {
+            throw new IllegalStateException("Cannot place order: Cart is empty.");
+        }
+
+        Order order = new Order(user);
+
+        // Process items with pessimistic locking to ensure stock integrity
+        for (CartItem cartItem : cart.getItems()) {
+            Product product = productRepo.findByIdWithLock(cartItem.getProduct().getId())
+                    .orElseThrow(() -> new EntityNotFoundException("Product not found or unavailable: " + cartItem.getProduct().getId()));
+
+            product.decreaseStock(cartItem.getQuantity());
+
+            OrderItem orderItem = new OrderItem(product, cartItem.getQuantity(), product.getPrice());
+            order.addItem(orderItem);
+        }
+
+        // Apply business logic for discount codes
+        if (request.discountCode() != null && !request.discountCode().isBlank()) {
+            DiscountCode dc = discountCodeRepo.findByCodeIgnoreCaseAndDeletedFalse(request.discountCode().trim())
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid or expired discount code"));
+            
+            order.applyDiscount(dc);
+        }
+
+        Order savedOrder = orderRepo.save(order);
+
+        // Initialize payment record
+        Payment payment = new Payment(savedOrder, "STRIPE", savedOrder.getTotalAmount());
+        paymentRepo.save(payment);
+
+        // Cleanup resources
+        cartService.clearCart();
+        
+        // External integration
+        PaymentIntentResponseDTO stripeInfo = paymentService.createPaymentIntent(savedOrder);
+
+        OrderResponseDTO baseDto = mapper.toDto(savedOrder);
+        return new OrderResponseDTO(
+                baseDto.id(),
+                baseDto.status(),
+                baseDto.totalAmount(),
+                baseDto.createdAt(),
+                stripeInfo
+        );
+    }
+
+    /**
+     * Retrieves an order by its ID with strict ownership validation.
+     *
+     * @param id order identifier.
+     * @return detailed order information.
+     * @throws AccessDeniedException if a non-admin user attempts to view another user's order.
      */
     @Override
     @Transactional(readOnly = true)
     public OrderDetailedResponseDTO findById(UUID id) {
         Order order = orderRepo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Order not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Order not found: " + id));
 
         User currentUser = userService.getCurrentUserEntity();
-        boolean isAdmin = currentUser.getRoles().stream().anyMatch(role -> role.getName().equals("ROLE_ADMIN"));
-        boolean isOwner = order.getUser().getId().equals(currentUser.getId());
-
-        if (!isAdmin && !isOwner) {
-            throw new AccessDeniedException("Unauthorized access to order data");
+        boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
+        
+        if (!isAdmin && !order.getUser().getId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("You are not authorized to view this order.");
         }
-
         return mapper.toDetailedDto(order);
     }
 
@@ -110,94 +183,5 @@ public class OrderServiceImpl implements OrderService {
     public Page<OrderResponseDTO> findMyOrders(Pageable pageable) {
         User currentUser = userService.getCurrentUserEntity();
         return orderRepo.findByUser(currentUser, pageable).map(mapper::toDto);
-    }
-
-    /**
-     * Processes and persists a new customer order.
-     * <p>
-     * The process includes:
-     * <ul>
-     * <li>Validating stock availability</li>
-     * <li>Updating product inventory levels</li>
-     * <li>Applying promotional discounts if a valid code is provided</li>
-     * <li>Initiating a payment intent via {@link PaymentService}</li>
-     * </ul>
-     * </p>
-     *
-     * @param request the order creation details.
-     * @return a summary of the created order including payment gateway information.
-     * @throws IllegalStateException if stock is insufficient or discount code is invalid.
-     */
-    @Override
-    @Transactional
-    public OrderResponseDTO placeOrder(OrderCreateRequestDTO request) {
-        User user = userService.getCurrentUserEntity();
-        Order order = new Order(user, BigDecimal.ZERO);
-        BigDecimal subtotal = BigDecimal.ZERO;
-
-        for (var itemRequest : request.getItems()) {
-            Product product = productRepo.findById(itemRequest.getProductId())
-                    .orElseThrow(() -> new EntityNotFoundException("Product not found: " + itemRequest.getProductId()));
-
-            if (product.getStock() < itemRequest.getQuantity()) {
-                throw new IllegalStateException("Insufficient stock for product: " + product.getName());
-            }
-
-            product.updateStock(product.getStock() - itemRequest.getQuantity());
-            BigDecimal priceAtPurchase = product.getPrice();
-            BigDecimal lineTotal = priceAtPurchase.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
-            subtotal = subtotal.add(lineTotal);
-
-            order.addItem(new OrderItem(product, itemRequest.getQuantity(), priceAtPurchase));
-        }
-
-        BigDecimal finalAmount = applyDiscountIfApplicable(request.getDiscountCode(), subtotal, order);
-
-        order.setTotalAmount(finalAmount);
-        Order savedOrder = orderRepo.save(order);
-
-        Payment payment = new Payment(savedOrder, "STRIPE", finalAmount);
-        paymentRepo.save(payment);
-
-        PaymentIntentResponseDTO stripeInfo = paymentService.createPaymentIntent(savedOrder);
-
-        OrderResponseDTO baseDto = mapper.toDto(savedOrder);
-        return new OrderResponseDTO(
-                baseDto.id(),
-                baseDto.status(),
-                baseDto.totalAmount(),
-                baseDto.createdAt(),
-                stripeInfo
-        );
-    }
-
-    /**
-     * Internal logic to validate and apply a discount code to the order subtotal.
-     *
-     * @param code the discount code string.
-     * @param subtotal the initial amount before discount.
-     * @param order the current order entity.
-     * @return the final calculated amount after applying the discount.
-     */
-    private BigDecimal applyDiscountIfApplicable(String code, BigDecimal subtotal, Order order) {
-        if (code == null || code.isBlank()) {
-            return subtotal;
-        }
-
-        DiscountCode dc = discountCodeRepo.findByCodeIgnoreCaseAndDeletedFalse(code)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid discount code"));
-
-        if (!dc.canBeUsed()) {
-            throw new IllegalStateException("Discount code expired or limit reached");
-        }
-
-        BigDecimal discountMultiplier = BigDecimal.valueOf(100 - dc.getDiscountPercent())
-                .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-        
-        BigDecimal finalAmount = subtotal.multiply(discountMultiplier).setScale(2, RoundingMode.HALF_UP);
-
-        dc.incrementUsage();
-
-        return finalAmount;
     }
 }
