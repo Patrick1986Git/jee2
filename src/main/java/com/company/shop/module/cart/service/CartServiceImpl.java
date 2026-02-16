@@ -74,9 +74,11 @@ public class CartServiceImpl implements CartService {
 
     /**
      * Adds a product to the cart with strict stock checking.
-     * * @throws EntityNotFoundException if the requested product does not exist.
-     * @throws IllegalArgumentException if the combined quantity in cart and request 
-     * exceeds warehouse stock.
+     *
+     * @param request DTO containing product identifier and quantity.
+     * @return updated {@link CartResponseDTO}.
+     * @throws EntityNotFoundException if the requested product does not exist.
+     * @throws IllegalArgumentException if the combined quantity exceeds warehouse stock.
      */
     @Override
     public CartResponseDTO addToCart(AddToCartRequestDTO request) {
@@ -130,6 +132,23 @@ public class CartServiceImpl implements CartService {
             cart.clear();
             cartRepository.save(cart);
         });
+    }
+
+    /**
+     * Retrieves the raw {@link Cart} entity for internal module processing.
+     * <p>
+     * Utilizes optimized fetch join to retrieve all items and product data in a single roundtrip.
+     * </p>
+     *
+     * @param userId unique identifier of the user.
+     * @return the {@link Cart} entity.
+     * @throws EntityNotFoundException if no cart is associated with the user.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Cart getCartEntityForUser(UUID userId) {
+        return cartRepository.findByUserIdWithItems(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Cart not found for user: " + userId));
     }
 
     /**
