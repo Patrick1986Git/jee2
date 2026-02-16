@@ -5,16 +5,16 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import com.company.shop.module.order.dto.OrderCreateRequestDTO;
+import com.company.shop.module.order.dto.OrderCheckoutRequestDTO;
 import com.company.shop.module.order.dto.OrderDetailedResponseDTO;
 import com.company.shop.module.order.dto.OrderResponseDTO;
 
 public interface OrderService {
-	OrderResponseDTO placeOrder(OrderCreateRequestDTO request);
+	OrderResponseDTO placeOrderFromCart(OrderCheckoutRequestDTO request);
 
 	OrderDetailedResponseDTO findById(UUID id);
-	
-	Page<OrderResponseDTO> findAll(Pageable pageable); // Metoda dla admina (widzi wszystko)
 
-	Page<OrderResponseDTO> findMyOrders(Pageable pageable); // Opcjonalnie: lista zamówień tylko dla zalogowanego usera
+	Page<OrderResponseDTO> findAll(Pageable pageable);
+
+	Page<OrderResponseDTO> findMyOrders(Pageable pageable);
 }
