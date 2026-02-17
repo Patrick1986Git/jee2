@@ -1,19 +1,42 @@
+/*
+ * Copyright (c) 2026 Your Company Name. All rights reserved.
+ *
+ * This software is the confidential and proprietary information of Your Company Name.
+ * You shall not disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into with Your Company.
+ */
+
 package com.company.shop.module.product.entity;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import org.hibernate.annotations.SQLRestriction;
 
 import com.company.shop.common.model.SoftDeleteEntity;
 import com.company.shop.module.category.entity.Category;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
+/**
+ * Core entity representing a commercial product within the catalog.
+ * <p>
+ * This entity serves as an Aggregate Root for product-related data, including
+ * inventory levels, pricing, and media assets. It maintains strict invariants
+ * regarding stock management and financial calculations.
+ * </p>
+ *
+ * @since 1.0.0
+ */
 @Entity
 @Table(name = "products")
 @SQLRestriction("deleted = false")
@@ -47,8 +70,14 @@ public class Product extends SoftDeleteEntity {
 	@Column(name = "review_count", nullable = false)
 	private int reviewCount = 0;
 
+	/**
+	 * Managed gallery of product images. Uses CascadeType.ALL and orphanRemoval to
+	 * ensure that image lifecycle is strictly bound to the product.
+	 */
+	@OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+	private List<ProductImage> images = new ArrayList<>();
+
 	protected Product() {
-		// JPA
 	}
 
 	public Product(String name, String slug, String sku, String description, BigDecimal price, int stock,
@@ -65,12 +94,46 @@ public class Product extends SoftDeleteEntity {
 	}
 
 	/**
-	 * Logika biznesowa aktualizacji statystyk recenzji. Metoda ta powinna być
-	 * wywoływana przez serwis po dodaniu/usunięciu recenzji.
+	 * Replaces the entire image gallery with a new set of URLs.
+	 * <p>
+	 * Due to {@code orphanRemoval}, existing images not present in the new list
+	 * will be deleted from the database.
+	 * </p>
+	 *
+	 * @param newImageUrls list of new image resource locations.
 	 */
+	public void replaceImages(List<String> newImageUrls) {
+		this.images.clear();
+		if (newImageUrls != null) {
+			newImageUrls.forEach(this::addImage);
+		}
+	}
+
+	/**
+	 * Adds a single image to the product gallery.
+	 *
+	 * @param url the location of the image resource.
+	 */
+	public void addImage(String url) {
+		ProductImage image = new ProductImage(url, this);
+		this.images.add(image);
+	}
+
+	/**
+	 * Resolves the primary image for the product.
+	 *
+	 * @return the URL of the first image in the gallery, or {@code null} if empty.
+	 */
+	public String getMainImageUrl() {
+		if (images != null && !images.isEmpty()) {
+			return images.get(0).getImageUrl();
+		}
+		return null;
+	}
+
 	public void updateRatings(Double newAverage, int newCount) {
 		if (newCount < 0) {
-			throw new IllegalArgumentException("Liczba recenzji nie może być ujemna");
+			throw new IllegalArgumentException("Review count cannot be negative");
 		}
 		this.averageRating = newAverage;
 		this.reviewCount = newCount;
@@ -87,9 +150,27 @@ public class Product extends SoftDeleteEntity {
 
 	public void updateStock(int newStock) {
 		if (newStock < 0) {
-			throw new IllegalArgumentException("Stan magazynowy nie może być ujemny");
+			throw new IllegalArgumentException("Stock level cannot be negative");
 		}
 		this.stock = newStock;
+	}
+
+	/**
+	 * Safely decreases stock level.
+	 *
+	 * @param quantityToDecrease number of units to remove.
+	 * @throws IllegalStateException if the requested quantity exceeds available
+	 *                               stock.
+	 */
+	public void decreaseStock(int quantityToDecrease) {
+		if (quantityToDecrease <= 0) {
+			throw new IllegalArgumentException("Quantity to decrease must be positive");
+		}
+		if (this.stock < quantityToDecrease) {
+			throw new IllegalStateException(
+					"Insufficient stock for product: " + this.name + ". Available: " + this.stock);
+		}
+		this.stock -= quantityToDecrease;
 	}
 
 	public String getName() {
@@ -126,5 +207,14 @@ public class Product extends SoftDeleteEntity {
 
 	public int getReviewCount() {
 		return reviewCount;
+	}
+
+	/**
+	 * Returns an unmodifiable view of the product images.
+	 *
+	 * @return a read-only list of {@link ProductImage} entities.
+	 */
+	public List<ProductImage> getImages() {
+		return Collections.unmodifiableList(images);
 	}
 }
