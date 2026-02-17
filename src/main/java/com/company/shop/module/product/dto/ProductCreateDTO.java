@@ -1,6 +1,7 @@
 package com.company.shop.module.product.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.constraints.DecimalMin;
@@ -17,7 +18,7 @@ public class ProductCreateDTO {
 
 	@NotBlank(message = "SKU nie może być puste")
 	@Size(max = 50, message = "SKU nie może przekraczać 50 znaków")
-	private String sku; // Unikalny identyfikator biznesowy
+	private String sku;
 
 	private String description;
 
@@ -31,17 +32,9 @@ public class ProductCreateDTO {
 	@NotNull(message = "Kategoria jest wymagana")
 	private UUID categoryId;
 
-	// Pusty konstruktor - standard przy braku Lomboka
-	public ProductCreateDTO() {
-	}
+	private List<String> imageUrls;
 
-	public ProductCreateDTO(String name, String sku, String description, BigDecimal price, int stock, UUID categoryId) {
-		this.name = name;
-		this.sku = sku;
-		this.description = description;
-		this.price = price;
-		this.stock = stock;
-		this.categoryId = categoryId;
+	public ProductCreateDTO() {
 	}
 
 	public String getName() {
@@ -66,5 +59,9 @@ public class ProductCreateDTO {
 
 	public UUID getCategoryId() {
 		return categoryId;
+	}
+
+	public List<String> getImageUrls() {
+		return imageUrls;
 	}
 }
