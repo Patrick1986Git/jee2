@@ -15,16 +15,21 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.company.shop.module.product.entity.Product;
 
+import jakarta.persistence.LockModeType;
+
 /**
- * Repository interface for {@link Product} entity management.
+ * Data access layer for {@link Product} entity management.
  * <p>
- * This interface combines standard CRUD operations via {@link JpaRepository} 
- * with advanced, type-safe dynamic querying capabilities via {@link JpaSpecificationExecutor}.
- * It supports pagination, sorting, and SEO-friendly lookups.
+ * Supports advanced querying through {@link JpaSpecificationExecutor} and 
+ * provides transactional locking mechanisms to ensure data consistency during 
+ * high-concurrency inventory operations.
  * </p>
  *
  * @since 1.0.0
@@ -33,55 +38,49 @@ import com.company.shop.module.product.entity.Product;
 public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpecificationExecutor<Product> {
 
     /**
-     * Retrieves a product by its unique SEO-friendly slug.
+     * Retrieves a product by its unique identifier with a pessimistic write lock.
+     * <p>
+     * Use this method during checkout or stock updates to prevent concurrent 
+     * modifications and ensure ACID compliance for inventory levels.
+     * </p>
      *
-     * @param slug the unique string identifier used in URLs.
-     * @return an {@link Optional} containing the product if found.
+     * @param id the unique identifier of the product.
+     * @return an {@link Optional} containing the locked product, or empty if not found.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    Optional<Product> findByIdWithLock(@Param("id") UUID id);
+
+    /**
+     * Finds a product by its SEO-friendly slug.
+     *
+     * @param slug the unique product slug.
+     * @return an {@link Optional} containing the product.
      */
     Optional<Product> findBySlug(String slug);
 
     /**
-     * Retrieves a product by its unique Stock Keeping Unit (SKU).
+     * Checks if a product exists with the given Stock Keeping Unit (SKU).
      *
-     * @param sku the unique business identifier for the product.
-     * @return an {@link Optional} containing the product if found.
-     */
-    Optional<Product> findBySku(String sku);
-
-    /**
-     * Finds products belonging to a specific category with pagination support.
-     *
-     * @param categoryId unique identifier of the category.
-     * @param pageable   pagination and sorting information.
-     * @return a page of products matching the category.
-     */
-    Page<Product> findByCategoryId(UUID categoryId, Pageable pageable);
-
-    /**
-     * Performs a basic case-insensitive search by product name.
-     * <p>
-     * Note: For advanced linguistic search, use Specifications with PostgreSQL FTS.
-     * </p>
-     *
-     * @param name     the partial name to search for.
-     * @param pageable pagination and sorting information.
-     * @return a page of products containing the name string.
-     */
-    Page<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
-
-    /**
-     * Checks if a product with the given SKU already exists in the system.
-     *
-     * @param sku the SKU to check.
-     * @return true if the SKU is already taken.
+     * @param sku the SKU to verify.
+     * @return {@code true} if a record exists.
      */
     boolean existsBySku(String sku);
 
     /**
-     * Checks if a product with the given slug already exists in the system.
+     * Checks if a product exists with the given slug.
      *
-     * @param slug the slug to check.
-     * @return true if the slug is already taken.
+     * @param slug the slug to verify.
+     * @return {@code true} if a record exists.
      */
     boolean existsBySlug(String slug);
+
+    /**
+     * Retrieves a paginated list of products belonging to a specific category.
+     *
+     * @param categoryId the identifier of the category.
+     * @param pageable   pagination and sorting configuration.
+     * @return a page of products.
+     */
+    Page<Product> findByCategoryId(UUID categoryId, Pageable pageable);
 }
