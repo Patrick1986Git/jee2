@@ -31,11 +31,12 @@ import com.company.shop.module.product.specification.ProductSpecification;
 import jakarta.persistence.EntityNotFoundException;
 
 /**
- * Production-grade implementation of the {@link ProductService}.
+ * Production implementation of {@link ProductService} providing high-level 
+ * catalog management and search capabilities.
  * <p>
- * This service manages the product catalog, handling SEO-friendly slug generation,
- * stock management, and complex search operations using JPA Specifications.
- * All write operations are transactional.
+ * This service orchestrates complex business operations such as SEO-friendly slug 
+ * generation, transactional media gallery updates, and advanced filtering 
+ * through JPA Specifications.
  * </p>
  *
  * @since 1.0.0
@@ -51,6 +52,9 @@ public class ProductServiceImpl implements ProductService {
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 
+    /**
+     * Constructs the service with required core dependencies.
+     */
     public ProductServiceImpl(ProductRepository productRepo, 
                               CategoryRepository categoryRepo, 
                               ProductMapper mapper) {
@@ -88,11 +92,15 @@ public class ProductServiceImpl implements ProductService {
     }
 
     /**
-     * {@inheritDoc}
+     * Creates a new product and initializes its media gallery.
      * <p>
-     * Implementation generates a unique slug based on the product name and validates
-     * SKU uniqueness before persisting.
+     * Ensures SKU uniqueness and handles potential slug collisions by 
+     * appending random suffixes.
      * </p>
+     *
+     * @param dto the product creation data.
+     * @return the persisted product details.
+     * @throws IllegalArgumentException if SKU is already taken.
      */
     @Override
     public ProductResponseDTO create(ProductCreateDTO dto) {
@@ -117,10 +125,24 @@ public class ProductServiceImpl implements ProductService {
                 dto.getStock(),
                 category
         );
+        
+        // Populate media gallery via Aggregate Root
+        product.replaceImages(dto.getImageUrls());
 
         return mapper.toDto(productRepo.save(product));
     }
 
+    /**
+     * Updates an existing product and synchronizes its image gallery.
+     * <p>
+     * Orchestrates the removal of orphaned images and the addition of new media 
+     * within a single database transaction.
+     * </p>
+     *
+     * @param id  the identifier of the product to update.
+     * @param dto the new product state.
+     * @return the updated product details.
+     */
     @Override
     public ProductResponseDTO update(UUID id, ProductCreateDTO dto) {
         Product product = productRepo.findById(id)
@@ -130,9 +152,13 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new EntityNotFoundException("Category not found"));
 
         String newSlug = generateSlug(dto.getName());
+        
         product.update(dto.getName(), newSlug, dto.getDescription(), dto.getPrice(), dto.getStock(), category);
+        
+        // Synchronize gallery state
+        product.replaceImages(dto.getImageUrls());
 
-        return mapper.toDto(product);
+        return mapper.toDto(productRepo.save(product));
     }
 
     @Override
@@ -142,34 +168,23 @@ public class ProductServiceImpl implements ProductService {
         product.delete();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductResponseDTO> searchProducts(ProductSearchCriteria criteria, Pageable pageable) {
+        return productRepo.findAll(ProductSpecification.filterByCriteria(criteria), pageable)
+                .map(mapper::toDto);
+    }
+
     /**
-     * Generates an SEO-friendly slug from the provided input string.
-     * <p>
-     * Replaces whitespaces with hyphens, removes non-latin characters,
-     * and normalizes Polish diacritics.
-     * </p>
+     * Transforms a raw string into an SEO-compliant URL slug.
      *
-     * @param input the string to slugify (e.g., product name).
-     * @return a lower-case, URL-safe string.
+     * @param input the string to slugify.
+     * @return a normalized, lowercase, hyphenated string.
      */
     private String generateSlug(String input) {
         String nowhitespace = WHITESPACE.matcher(input).replaceAll("-");
         String normalized = Normalizer.normalize(nowhitespace, Normalizer.Form.NFD);
         String slug = NONLATIN.matcher(normalized).replaceAll("");
         return slug.toLowerCase(Locale.ENGLISH);
-    }
-    
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Utilizes {@link ProductSpecification} to build dynamic queries based on
-     * full-text search and other filters.
-     * </p>
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponseDTO> searchProducts(ProductSearchCriteria criteria, Pageable pageable) {
-        return productRepo.findAll(ProductSpecification.filterByCriteria(criteria), pageable)
-                .map(mapper::toDto);
     }
 }
