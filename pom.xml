@@ -21,16 +21,17 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.4.1</version>
+		<version>3.5.10</version>
 		<relativePath />
 	</parent>
 
 	<properties>
 		<java.version>17</java.version>
-		<mapstruct.version>1.5.5.Final</mapstruct.version>
-		<jjwt.version>0.11.5</jjwt.version>
+		<mapstruct.version>1.6.3</mapstruct.version>
+		<jjwt.version>0.13.0</jjwt.version>
 		<stripe.version>28.2.0</stripe.version>
-		
+		<springdoc.version>2.8.5</springdoc.version>
+
 		<hibernate-jpamodelgen.version>${hibernate.version}</hibernate-jpamodelgen.version>
 	</properties>
 
@@ -129,8 +130,9 @@
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-			<version>2.2.0</version>
+			<version>${springdoc.version}</version>
 		</dependency>
+
 
 		<!-- === TESTING === -->
 		<dependency>
@@ -145,11 +147,6 @@
 			<scope>test</scope>
 		</dependency>
 
-		<dependency>
-			<groupId>pl.personmanagement</groupId>
-			<artifactId>person-management-form</artifactId>
-			<version>1.0.0-SNAPSHOT</version>
-		</dependency>
 	</dependencies>
 
 	<!-- ========================= -->
@@ -172,7 +169,8 @@
 				<configuration>
 					<source>${java.version}</source>
 					<target>${java.version}</target>
-					<generatedSourcesDirectory>${project.build.directory}/generated-sources/annotations</generatedSourcesDirectory>
+					<generatedSourcesDirectory>
+						${project.build.directory}/generated-sources/annotations</generatedSourcesDirectory>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.mapstruct</groupId>
