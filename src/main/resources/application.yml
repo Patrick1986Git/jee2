@@ -1,6 +1,7 @@
 # #############################################################################
-# ENTERPRISE SHOP CONFIGURATION
-# Application: enterprise-shop
+# ENTERPRISE SHOP CENTRAL CONFIGURATION
+# Version: 1.0.0
+# Description: Global application settings, infrastructure and security.
 # #############################################################################
 
 spring:
@@ -10,31 +11,66 @@ spring:
   profiles:
     active: dev
 
-  # Configuration for Global Exception Handling
+  # Global MVC & Resource Handling
+  # Configuration ensures that 404 errors are handled as exceptions for consistent API responses.
   mvc:
     throw-exception-if-no-handler-found: true
   web:
     resources:
       add-mappings: false
 
-  # Internationalization (i18n) settings
+  # Internationalization (i18n)
+  # Centralized message management for multi-language support.
   messages:
     basename: i18n/messages
     encoding: UTF-8
     fallback-to-system-locale: false
 
-  # JSON Serialization precision settings
+  # JSON Processing (Jackson)
+  # Standardized ISO-8601 date formatting for frontend compatibility.
   jackson:
     serialization:
       WRITE_DATES_AS_TIMESTAMPS: false
     time-zone: Europe/Warsaw
 
+# #############################################################################
+# API DOCUMENTATION (SpringDoc / OpenAPI 3.0)
+# Automated documentation for RESTful endpoints.
+# #############################################################################
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    # UI Customization for better Developer Experience (DX)
+    operations-sorter: method       # Logical sorting by HTTP Verb
+    tags-sorter: alpha              # Alphabetical module grouping
+    display-request-duration: true  # Benchmarking execution time per request
+  show-actuator: true               # Exposes management endpoints for monitoring transparency
+  default-produces-media-type: application/json
+
+# #############################################################################
+# SERVER & MONITORING (Actuator)
+# #############################################################################
 server:
   port: 8080
+  # Error response detail level (Adjust to 'never' for Production environment)
   error:
     include-message: always
     include-binding-errors: always
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+# #############################################################################
+# OBSERVABILITY & LOGGING
+# #############################################################################
 logging:
   level:
     root: INFO
@@ -42,21 +78,14 @@ logging:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql: TRACE
 
-# Health Monitoring
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-
 # #############################################################################
-# STRIPE PAYMENT GATEWAY CONFIGURATION
-# All keys should be provided via Environment Variables in Production.
+# INTEGRATIONS: STRIPE PAYMENT GATEWAY
+# Sensitive keys must be injected via secure Environment Variables or Vault.
 # #############################################################################
 stripe:
-  # Secret key for server-side API calls
-  api-key: ${STRIPE_SECRET_KEY:sk_test_twój_klucz}
-  # Webhook secret for verifying Stripe event authenticity
-  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_twój_klucz}
-  # Public key used by front-end clients to initialize Stripe Elements
-  public-key: ${STRIPE_PUBLIC_KEY:pk_test_twój_klucz}
+  # Secret key for server-to-server communication (Restricted API access)
+  api-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
+  # Webhook secret used for cryptographic signature verification in PaymentServiceImpl
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  # Public key for client-side Stripe Elements/SDK initialization
+  public-key: ${STRIPE_PUBLIC_KEY:pk_test_placeholder}
