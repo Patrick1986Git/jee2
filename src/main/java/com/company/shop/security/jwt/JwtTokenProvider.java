@@ -1,10 +1,18 @@
+/*
+ * Copyright (c) 2026 Your Company Name. All rights reserved.
+ *
+ * This software is the confidential and proprietary information of Your Company Name.
+ * You shall not disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into with Your Company.
+ */
+
 package com.company.shop.security.jwt;
 
 import java.security.Key;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.stream.Collectors;
+
+import javax.crypto.SecretKey;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -14,59 +22,111 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 
+/**
+ * Core security component responsible for the lifecycle of JSON Web Tokens (JWT).
+ * <p>
+ * This provider handles the issuance, cryptographic verification, and extraction 
+ * of user identity and authorization claims using the JJWT library (v0.13.0).
+ * It utilizes HMAC-SHA algorithms for secure token signing.
+ * </p>
+ *
+ * @since 1.0.0
+ */
 @Component
 public class JwtTokenProvider {
 
-	private final JwtProperties properties;
-	private final Key key;
+    private final JwtProperties properties;
+    private final Key key;
 
-	public JwtTokenProvider(JwtProperties properties) {
-		this.properties = properties;
-		this.key = Keys.hmacShaKeyFor(properties.getSecret().getBytes());
-	}
+    /**
+     * Constructs the provider and initializes the cryptographic key.
+     *
+     * @param properties configuration properties containing the secret and expiration limits.
+     */
+    public JwtTokenProvider(JwtProperties properties) {
+        this.properties = properties;
+        this.key = Keys.hmacShaKeyFor(properties.getSecret().getBytes());
+    }
 
-	public String generateToken(Authentication authentication) {
-		Date now = new Date();
-		Date expiry = new Date(now.getTime() + properties.getExpiration());
+    /**
+     * Generates a signed JWT for an authenticated principal.
+     * <p>
+     * Encodes user roles as a custom claim "roles" to facilitate stateless 
+     * authorization in subsequent requests.
+     * </p>
+     *
+     * @param authentication the principal's authentication details.
+     * @return a compact, URL-safe JWT string.
+     */
+    public String generateToken(Authentication authentication) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + properties.getExpiration());
 
-		// Pobieramy role i łączymy je w jeden ciąg znaków (np. "ROLE_USER,ROLE_ADMIN")
-		String authorities = authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority)
-				.collect(Collectors.joining(","));
+        String authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(","));
 
-		Map<String, Object> claims = new HashMap<>();
-		claims.put("roles", authorities);
+        return Jwts.builder()
+                .subject(authentication.getName())
+                .claim("roles", authorities)
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(key)
+                .compact();
+    }
 
-		return Jwts.builder().setClaims(claims) // Ustawienie własnych claimów
-				.setSubject(authentication.getName()).setIssuedAt(now).setExpiration(expiry)
-				.signWith(key, SignatureAlgorithm.HS256).compact();
-	}
+    /**
+     * Extracts the subject (username) from a verified JWT.
+     *
+     * @param token the JWT string.
+     * @return the principal's username.
+     */
+    public String getUsername(String token) {
+        return parseClaims(token).getPayload().getSubject();
+    }
 
-	public String getUsername(String token) {
-		return parseClaims(token).getBody().getSubject();
-	}
+    /**
+     * Extracts the custom "roles" claim from a verified JWT.
+     *
+     * @param token the JWT string.
+     * @return a comma-separated string of authorities.
+     */
+    public String getRoles(String token) {
+        return parseClaims(token).getPayload().get("roles", String.class);
+    }
 
-	/**
-	 * Pobiera role zapisane w tokenie. Przyda się w filtrze do odbudowania obiektu
-	 * Authentication.
-	 */
-	public String getRoles(String token) {
-		return parseClaims(token).getBody().get("roles", String.class);
-	}
+    /**
+     * Performs cryptographic and temporal validation of the provided token.
+     *
+     * @param token the JWT string to validate.
+     * @return {@code true} if the token is authentic and not expired; {@code false} otherwise.
+     */
+    public boolean validate(String token) {
+        try {
+            parseClaims(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            // In enterprise environments, consider logging specific causes:
+            // e.g., ExpiredJwtException, SignatureException
+            return false;
+        }
+    }
 
-	public boolean validate(String token) {
-		try {
-			parseClaims(token);
-			return true;
-		} catch (JwtException | IllegalArgumentException e) {
-			// W Enterprise warto tutaj zalogować konkretny powód (np. expired vs invalid signature)
-			return false;
-		}
-	}
-
-	private Jws<Claims> parseClaims(String token) {
-		return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
-	}
+    /**
+     * Internal helper to parse and verify the JWT signature.
+     * <p>
+     * Utilizes the new JJWT 0.13.0 fluent API for signature verification.
+     * </p>
+     *
+     * @param token the raw JWT string.
+     * @return verified {@link Jws} claims.
+     */
+    private Jws<Claims> parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith((SecretKey) key)
+                .build()
+                .parseSignedClaims(token);
+    }
 }
