@@ -41,18 +41,15 @@ import jakarta.persistence.EntityNotFoundException;
 /**
  * Production implementation of {@link OrderService} managing high-integrity transactional order placement.
  * <p>
- * This implementation orchestrates complex business processes including:
- * <ul>
- * <li>Pessimistic locking of products to prevent overselling.</li>
- * <li>Atomic conversion of shopping carts to formalized orders.</li>
- * <li>Integration with external payment providers (Stripe).</li>
- * <li>Validation of domain invariants and security-scoped order retrieval.</li>
- * </ul>
+ * This class is marked with {@link Transactional} at the class level to ensure that all 
+ * business methods are executed within a physical transaction, maintaining strict 
+ * ACID properties across multiple repository calls.
  * </p>
  *
  * @since 1.0.0
  */
 @Service
+@Transactional
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepo;
@@ -66,6 +63,15 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * Constructs the service with comprehensive dependency injection.
+     *
+     * @param orderRepo        repository for order persistence.
+     * @param productRepo      repository for product stock management.
+     * @param paymentRepo      repository for tracking payment records.
+     * @param discountCodeRepo repository for validating marketing codes.
+     * @param userService      service for identity and principal resolution.
+     * @param cartService      service for managing user shopping sessions.
+     * @param mapper           component for entity-to-dto transformation.
+     * @param paymentService   adapter for external payment gateway integration.
      */
     public OrderServiceImpl(OrderRepository orderRepo, 
                             ProductRepository productRepo, 
@@ -86,19 +92,13 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * Places an order from the user's current cart.
+     * {@inheritDoc}
      * <p>
-     * Operation is fully transactional. If payment intent creation fails or stock is 
-     * insufficient, the entire operation (including stock deduction) is rolled back.
+     * Implementation details: Uses pessimistic locking on products and executes 
+     * within a mandatory transaction to ensure stock and order consistency.
      * </p>
-     *
-     * @param request checkout details including optional discount codes.
-     * @return {@link OrderResponseDTO} enriched with Stripe payment intent data.
-     * @throws IllegalStateException if cart is empty.
-     * @throws EntityNotFoundException if products in cart are no longer available.
      */
     @Override
-    @Transactional
     public OrderResponseDTO placeOrderFromCart(OrderCheckoutRequestDTO request) {
         User user = userService.getCurrentUserEntity();
         Cart cart = cartService.getCartEntityForUser(user.getId());
@@ -109,10 +109,9 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = new Order(user);
 
-        // Process items with pessimistic locking to ensure stock integrity
         for (CartItem cartItem : cart.getItems()) {
             Product product = productRepo.findByIdWithLock(cartItem.getProduct().getId())
-                    .orElseThrow(() -> new EntityNotFoundException("Product not found or unavailable: " + cartItem.getProduct().getId()));
+                    .orElseThrow(() -> new EntityNotFoundException("Product not found: " + cartItem.getProduct().getId()));
 
             product.decreaseStock(cartItem.getQuantity());
 
@@ -120,7 +119,6 @@ public class OrderServiceImpl implements OrderService {
             order.addItem(orderItem);
         }
 
-        // Apply business logic for discount codes
         if (request.discountCode() != null && !request.discountCode().isBlank()) {
             DiscountCode dc = discountCodeRepo.findByCodeIgnoreCaseAndDeletedFalse(request.discountCode().trim())
                     .orElseThrow(() -> new IllegalArgumentException("Invalid or expired discount code"));
@@ -130,14 +128,11 @@ public class OrderServiceImpl implements OrderService {
 
         Order savedOrder = orderRepo.save(order);
 
-        // Initialize payment record
         Payment payment = new Payment(savedOrder, "STRIPE", savedOrder.getTotalAmount());
         paymentRepo.save(payment);
 
-        // Cleanup resources
         cartService.clearCart();
         
-        // External integration
         PaymentIntentResponseDTO stripeInfo = paymentService.createPaymentIntent(savedOrder);
 
         OrderResponseDTO baseDto = mapper.toDto(savedOrder);
@@ -151,11 +146,10 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * Retrieves an order by its ID with strict ownership validation.
-     *
-     * @param id order identifier.
-     * @return detailed order information.
-     * @throws AccessDeniedException if a non-admin user attempts to view another user's order.
+     * {@inheritDoc}
+     * <p>
+     * Security check: Verifies if the requester is the owner of the order or has administrative privileges.
+     * </p>
      */
     @Override
     @Transactional(readOnly = true)
