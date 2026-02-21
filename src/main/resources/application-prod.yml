@@ -1,29 +1,58 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://db-prod:5432/enterprise_shop
-    username: shop_prod
-    password: STRONG_PROD_PASSWORD
-    driver-class-name: org.postgresql.Driver
+# #############################################################################
+# ENTERPRISE SHOP - PRODUCTION PROFILE CONFIGURATION
+# Active Profile: prod
+# Description: Hardened configuration for high-availability environments.
+# #############################################################################
 
+spring:
+  # Persistence Layer: Production Database Connectivity
+  # Credentials must be injected via secure environment variables.
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    # Highly recommended: configure connection pool (Hikari) for production
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+  # JPA & Hibernate: Production Settings
+  # 'validate' ensures that no destructive schema changes occur.
   jpa:
     hibernate:
       ddl-auto: validate
-    open-in-view: false
-    show-sql: false
+    open-in-view: false # Prevents performance issues and DB connection leaking
+    show-sql: false     # Disabled for performance and security (avoids logging sensitive data)
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Optimization: enables batching for better performance
+        jdbc.batch_size: 25
 
+  # Database Migrations: Flyway
+  # Strict control over database schema versioning.
   flyway:
     enabled: true
     baseline-on-migrate: true
+    check-location: true
 
+# #############################################################################
+# SECURITY: JWT CONFIGURATION
+# Cryptographic settings for authentication.
+# #############################################################################
 security:
   jwt:
+    # Production secret MUST be a high-entropy string, min 256-bit, Base64-encoded.
     secret: ${JWT_SECRET}
-    expiration: 3600000
-    refresh-expiration: 86400000
+    expiration: 3600000          # 1 hour
+    refresh-expiration: 86400000 # 24 hours
 
+# #############################################################################
+# OBSERVABILITY: PRODUCTION LOGGING
+# Minimalistic logging to focus on system health and critical failures.
+# #############################################################################
 logging:
   level:
     root: WARN
+    com.company.shop: INFO # Business logic events
