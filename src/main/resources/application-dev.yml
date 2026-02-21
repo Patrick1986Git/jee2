@@ -1,20 +1,31 @@
+# #############################################################################
+# ENTERPRISE SHOP - DEVELOPMENT PROFILE CONFIGURATION
+# Active Profile: dev
+# Description: Configuration for local development environment using PostgreSQL.
+# #############################################################################
+
 spring:
+  # Persistence Layer: PostgreSQL Connectivity
   datasource:
     url: jdbc:postgresql://localhost:5432/enterprise_shop_dev
     username: shop_dev
     password: shop_dev
     driver-class-name: org.postgresql.Driver
 
+  # JPA & Hibernate: ORM Strategy
+  # In Dev, we use 'validate' to ensure DB schema matches entities without altering data.
   jpa:
     hibernate:
       ddl-auto: validate
-    open-in-view: false
-    show-sql: true
+    open-in-view: false # Disabled to avoid N+1 queries during view rendering
+    show-sql: true      # Logs generated SQL to console for debugging
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  # Database Migrations: Flyway
+  # Ensures that the database schema is evolved version-by-version in a repeatable way.
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -22,8 +33,17 @@ spring:
     schemas: public
     default-schema: public
 
+# #############################################################################
+# SECURITY: JWT CONFIGURATION
+# These settings control the issuance and verification of security tokens.
+# #############################################################################
 security:
   jwt:
-    secret: ToJestBardzoDlugiIKompleksowyKluczDoZabezpieczeniaTokenowJWT123!
-    expiration: 3600000 # 1h
-    refresh-expiration: 86400000 # 24h
+    # Security Notice: 
+    # The JWT_SECRET must be a Base64-encoded string of at least 256 bits for HS256.
+    # The placeholder value is strictly for local development isolation.
+    secret: ${JWT_SECRET:dev-only-secret-that-should-not-be-used-in-production-at-least-256-bits}
+    
+    # Token Lifespan Management
+    expiration: 3600000          # Access Token: 1h (in milliseconds)
+    refresh-expiration: 86400000 # Refresh Token: 24h (in milliseconds)
