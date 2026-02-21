@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2026 Your Company Name. All rights reserved.
+ *
+ * This software is the confidential and proprietary information of Your Company Name.
+ * You shall not disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into with Your Company.
+ */
+
 package com.company.shop.module.user.entity;
 
 import java.util.HashSet;
@@ -15,6 +23,15 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 
+/**
+ * Domain entity representing a system user account.
+ * <p>
+ * Implements soft-deletion via {@link SQLRestriction} and supports 
+ * role-based access control through a many-to-many relationship with {@link Role}.
+ * </p>
+ *
+ * @since 1.0.0
+ */
 @Entity
 @Table(name = "users")
 @SQLRestriction("deleted = false")
@@ -35,7 +52,14 @@ public class User extends SoftDeleteEntity {
     @Column(name = "last_name", length = 100)
     private String lastName;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    /**
+     * Set of security roles assigned to the user.
+     * <p>
+     * Switched to {@link FetchType#LAZY} to optimize performance and prevent 
+     * unintended data loading during batch processing or simple profile retrievals.
+     * </p>
+     */
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
@@ -43,10 +67,21 @@ public class User extends SoftDeleteEntity {
     )
     private Set<Role> roles = new HashSet<>();
 
+    /**
+     * Internal constructor for JPA proxying.
+     */
     protected User() {
         // JPA
     }
 
+    /**
+     * Specialized constructor for new user registration.
+     *
+     * @param email           unique email address used as identifier.
+     * @param encodedPassword secure, hashed password string.
+     * @param firstName       user's given name.
+     * @param lastName        user's family name.
+     */
     public User(String email, String encodedPassword, String firstName, String lastName) {
         this.email = email;
         this.password = encodedPassword;
@@ -89,10 +124,18 @@ public class User extends SoftDeleteEntity {
     
     // ===== BUSINESS METHODS =====
 
+    /**
+     * Grants a specific security role to this user.
+     *
+     * @param role the role to be added.
+     */
     public void addRole(Role role) {
         this.roles.add(role);
     }
 
+    /**
+     * Deactivates the user account without removing the record from the database.
+     */
     public void disable() {
         this.enabled = false;
     }
