@@ -38,7 +38,7 @@ public class UserServiceImpl implements UserService {
 	@Transactional(readOnly = true)
 	public UserResponseDTO findById(UUID id) {
 		return repository.findWithRolesById(id).map(mapper::toDto)
-				.orElseThrow(() -> new EntityNotFoundException("Użytkownik o ID: " + id + " nie został znaleziony"));
+				.orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + id));
 	}
 
 	@Override
@@ -49,13 +49,13 @@ public class UserServiceImpl implements UserService {
 		String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
 		return repository.findByEmailWithRoles(email).map(mapper::toDto).orElseThrow(
-				() -> new EntityNotFoundException("Nie znaleziono profilu zalogowanego użytkownika: " + email));
+				() -> new EntityNotFoundException("Authenticated user profile not found: " + email));
 	}
 
 	@Override
 	public UserResponseDTO update(UUID id, UserUpdateDTO dto) {
 		User user = repository.findById(id)
-				.orElseThrow(() -> new EntityNotFoundException("Nie można zaktualizować. Użytkownik nie istnieje."));
+				.orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + id));
 
 		user.setFirstName(dto.getFirstName());
 		user.setLastName(dto.getLastName());
@@ -69,7 +69,7 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public void delete(UUID id) {
 		User user = repository.findById(id)
-				.orElseThrow(() -> new EntityNotFoundException("Nie można usunąć. Użytkownik nie istnieje."));
+				.orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + id));
 
 		user.markDeleted();
 	}
@@ -79,6 +79,6 @@ public class UserServiceImpl implements UserService {
 	public User getCurrentUserEntity() {
 		String email = SecurityContextHolder.getContext().getAuthentication().getName();
 		return repository.findByEmailWithRoles(email)
-				.orElseThrow(() -> new EntityNotFoundException("Nie znaleziono użytkownika: " + email));
+				.orElseThrow(() -> new EntityNotFoundException("Authenticated user not found: " + email));
 	}
 }

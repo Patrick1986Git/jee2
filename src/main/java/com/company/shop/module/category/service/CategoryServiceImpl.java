@@ -45,7 +45,7 @@ public class CategoryServiceImpl implements CategoryService {
     public CategoryResponseDTO findById(UUID id) {
         return repo.findById(id)
                 .map(mapper::toDto)
-                .orElseThrow(() -> new EntityNotFoundException("Kategoria nie znaleziona"));
+                .orElseThrow(() -> new EntityNotFoundException("Category not found with ID: " + id));
     }
 
     @Override
@@ -53,13 +53,13 @@ public class CategoryServiceImpl implements CategoryService {
     public CategoryResponseDTO findBySlug(String slug) {
         return repo.findBySlug(slug)
                 .map(mapper::toDto)
-                .orElseThrow(() -> new EntityNotFoundException("Kategoria o slugu: " + slug + " nie istnieje"));
+                .orElseThrow(() -> new EntityNotFoundException("Category not found with slug: " + slug));
     }
 
     @Override
     public CategoryResponseDTO create(CategoryCreateDTO dto) {
         if (repo.existsByName(dto.getName())) {
-            throw new IllegalArgumentException("Kategoria o tej nazwie już istnieje");
+            throw new IllegalArgumentException("Category with this name already exists");
         }
 
         String slug = generateSlug(dto.getName());
@@ -68,7 +68,7 @@ public class CategoryServiceImpl implements CategoryService {
         Category parent = null;
         if (dto.getParentId() != null) {
             parent = repo.findById(dto.getParentId())
-                    .orElseThrow(() -> new EntityNotFoundException("Kategoria nadrzędna nie istnieje"));
+                    .orElseThrow(() -> new EntityNotFoundException("Parent category not found"));
         }
 
         Category category = new Category(dto.getName(), slug, dto.getDescription(), parent);
@@ -78,12 +78,12 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public CategoryResponseDTO update(UUID id, CategoryCreateDTO dto) {
         Category category = repo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Kategoria nie istnieje"));
+                .orElseThrow(() -> new EntityNotFoundException("Category not found with ID: " + id));
 
         Category parent = null;
         if (dto.getParentId() != null) {
             parent = repo.findById(dto.getParentId())
-                    .orElseThrow(() -> new EntityNotFoundException("Kategoria nadrzędna nie istnieje"));
+                    .orElseThrow(() -> new EntityNotFoundException("Parent category not found"));
         }
 
         String newSlug = generateSlug(dto.getName());

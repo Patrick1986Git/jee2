@@ -38,11 +38,11 @@ public class ProductReviewServiceImpl implements ProductReviewService {
 	    User user = userService.getCurrentUserEntity();
 
 	    if (reviewRepo.existsByProductIdAndUserId(dto.productId(), user.getId())) {
-	        throw new IllegalStateException("Już dodałeś opinię do tego produktu.");
+	        throw new IllegalStateException("You have already reviewed this product.");
 	    }
 
 	    Product product = productRepo.findById(dto.productId())
-	            .orElseThrow(() -> new EntityNotFoundException("Produkt nie istnieje"));
+	            .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + dto.productId()));
 
 	    // 1. Zapisz nową recenzję
 	    ProductReview review = new ProductReview(product, user, dto.rating(), dto.comment());
@@ -63,7 +63,7 @@ public class ProductReviewServiceImpl implements ProductReviewService {
 	@Override
 	public void deleteReview(UUID reviewId) {
 	    ProductReview review = reviewRepo.findById(reviewId)
-	            .orElseThrow(() -> new EntityNotFoundException("Opinia nie istnieje"));
+	            .orElseThrow(() -> new EntityNotFoundException("Review not found with ID: " + reviewId));
 
 	    // ... (Twoja logika uprawnień) ...
 

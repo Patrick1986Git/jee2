@@ -52,7 +52,7 @@ public class AuthServiceImpl implements AuthService {
 	public void register(RegisterRequestDTO request) {
 		if (userRepository.existsByEmail(request.getEmail())) {
 			throw new UserAlreadyExistsException(
-					"Użytkownik o podanym adresie email już istnieje: " + request.getEmail());
+					"User with this email already exists: " + request.getEmail());
 		}
 
 		// Tworzenie użytkownika z wykorzystaniem danych z DTO
@@ -61,7 +61,7 @@ public class AuthServiceImpl implements AuthService {
 
 		// Pobranie domyślnej roli
 		Role userRole = roleRepository.findByName("ROLE_USER").orElseThrow(
-				() -> new IllegalStateException("Błąd konfiguracji systemu: ROLE_USER nie istnieje w bazie"));
+				() -> new IllegalStateException("System configuration error: ROLE_USER not found in database"));
 
 		user.addRole(userRole);
 

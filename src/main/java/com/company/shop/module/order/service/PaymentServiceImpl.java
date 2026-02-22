@@ -84,7 +84,7 @@ public class PaymentServiceImpl implements PaymentService {
      *
      * @param order the order aggregate for which payment is being requested.
      * @return {@link PaymentIntentResponseDTO} containing the client secret for front-end SDK.
-     * @throws RuntimeException if the Stripe API request fails.
+     * @throws IllegalStateException if the Stripe API request fails.
      */
     @Override
     public PaymentIntentResponseDTO createPaymentIntent(Order order) {
@@ -98,7 +98,7 @@ public class PaymentServiceImpl implements PaymentService {
             PaymentIntent intent = PaymentIntent.create(params);
             return new PaymentIntentResponseDTO(intent.getClientSecret(), publicKey);
         } catch (Exception e) {
-            throw new RuntimeException("Error creating Stripe PaymentIntent", e);
+            throw new IllegalStateException("Payment processing failed. Please try again later.", e);
         }
     }
 
@@ -111,7 +111,7 @@ public class PaymentServiceImpl implements PaymentService {
      *
      * @param payload   raw JSON payload from the request body.
      * @param sigHeader the {@code Stripe-Signature} header for event verification.
-     * @throws RuntimeException if the signature is invalid or processing fails.
+     * @throws IllegalStateException if the signature is invalid or processing fails.
      */
     @Override
     @Transactional
@@ -136,7 +136,7 @@ public class PaymentServiceImpl implements PaymentService {
         } catch (Exception e) {
             // In a production environment, consider using a formal SLF4J logger
             System.err.println("Webhook error: " + e.getMessage());
-            throw new RuntimeException("Stripe webhook processing error", e);
+            throw new IllegalStateException("Stripe webhook processing failed. Please contact support.", e);
         }
     }
 }
