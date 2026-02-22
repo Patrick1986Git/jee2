@@ -1,9 +1,15 @@
+/*
+ * Copyright (c) 2026 Your Company Name. All rights reserved.
+ */
+
 package com.company.shop.common.exception;
 
-import java.time.LocalDateTime;
+import java.nio.file.AccessDeniedException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -11,48 +17,97 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import jakarta.persistence.EntityNotFoundException;
+
+/**
+ * Global interceptor for application-wide exception handling.
+ * <p>
+ * This class captures exceptions thrown by any controller and transforms them 
+ * into standardized {@link ApiError} responses. It also ensures that critical 
+ * system failures are properly logged for diagnostic purposes.
+ * </p>
+ *
+ * @since 1.0.0
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-	// 1. Obsługa błędów walidacji (@Valid)
-	@ExceptionHandler(MethodArgumentNotValidException.class)
-	public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
-		Map<String, String> errors = new HashMap<>();
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-		ex.getBindingResult().getAllErrors().forEach((error) -> {
-			String fieldName = ((FieldError) error).getField();
-			String errorMessage = error.getDefaultMessage();
-			errors.put(fieldName, errorMessage);
-		});
+    /**
+     * Handles validation failures for {@code @Valid} annotated parameters.
+     *
+     * @param ex the exception containing binding and validation results.
+     * @return a 400 Bad Request response with detailed field errors.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new HashMap<>();
 
-		Map<String, Object> body = new HashMap<>();
-		body.put("timestamp", LocalDateTime.now());
-		body.put("status", HttpStatus.BAD_REQUEST.value());
-		body.put("errors", errors);
+        ex.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
 
-		return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
-	}
+        log.warn("Input validation failed: {}", errors);
 
-	// 2. Obsługa błędu zajętego emaila
-	@ExceptionHandler(UserAlreadyExistsException.class)
-	public ResponseEntity<Map<String, Object>> handleUserAlreadyExists(UserAlreadyExistsException ex) {
-		Map<String, Object> body = new HashMap<>();
-		body.put("timestamp", LocalDateTime.now());
-		body.put("status", HttpStatus.CONFLICT.value()); // Status 409
-		body.put("message", ex.getMessage());
+        ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(), "Validation failed", errors);
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
 
-		return new ResponseEntity<>(body, HttpStatus.CONFLICT);
-	}
+    /**
+     * Handles conflicts during entity creation (e.g., unique constraint violations).
+     *
+     * @param ex the domain-specific exception for existing users.
+     * @return a 409 Conflict response.
+     */
+    @ExceptionHandler(UserAlreadyExistsException.class)
+    public ResponseEntity<ApiError> handleUserAlreadyExists(UserAlreadyExistsException ex) {
+        ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+    }
 
-	// 3. Obsługa pozostałych, nieprzewidzianych wyjątków (Globalny bezpiecznik)
-	@ExceptionHandler(Exception.class)
-	public ResponseEntity<Map<String, Object>> handleAllExceptions(Exception ex) {
-		Map<String, Object> body = new HashMap<>();
-		body.put("timestamp", LocalDateTime.now());
-		body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-		body.put("message", "Wystąpił nieoczekiwany błąd serwera.");
+    /**
+     * Handles cases where a requested resource does not exist in the database.
+     *
+     * @param ex the JPA entity not found exception.
+     * @return a 404 Not Found response.
+     */
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(EntityNotFoundException ex) {
+        ApiError apiError = new ApiError(HttpStatus.NOT_FOUND.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+    }
 
-		// Logujemy szczegóły błędu (warto użyć @Slf4j do logowania stacktrace)
-		return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
-	}
+    /**
+     * Handles authorization failures.
+     *
+     * @param ex the access denied exception.
+     * @return a 403 Forbidden response.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
+        ApiError apiError = new ApiError(HttpStatus.FORBIDDEN.value(), "Insufficient permissions to access this resource");
+        return new ResponseEntity<>(apiError, HttpStatus.FORBIDDEN);
+    }
+
+    /**
+     * Ultimate safety net for all unhandled runtime exceptions.
+     * <p>
+     * Logs the full stack trace at ERROR level to facilitate troubleshooting 
+     * while hiding sensitive internal details from the end user.
+     * </p>
+     *
+     * @param ex the caught exception.
+     * @return a 500 Internal Server Error response.
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiError> handleAllExceptions(Exception ex) {
+        log.error("Unhandled application exception: ", ex);
+
+        ApiError apiError = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "An unexpected server error occurred. Please contact support if the problem persists.");
+        return new ResponseEntity<>(apiError, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 }
