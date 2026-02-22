@@ -22,7 +22,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
 
   # Database Migrations: Flyway
   # Ensures that the database schema is evolved version-by-version in a repeatable way.
@@ -47,3 +46,13 @@ security:
     # Token Lifespan Management
     expiration: 3600000          # Access Token: 1h (in milliseconds)
     refresh-expiration: 86400000 # Refresh Token: 24h (in milliseconds)
+
+# #############################################################################
+# OBSERVABILITY & LOGGING (Dev Specific)
+# #############################################################################
+logging:
+  level:
+    root: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql: TRACE

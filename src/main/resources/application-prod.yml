@@ -26,7 +26,6 @@ spring:
     show-sql: false     # Disabled for performance and security (avoids logging sensitive data)
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         # Optimization: enables batching for better performance
         jdbc.batch_size: 25
 

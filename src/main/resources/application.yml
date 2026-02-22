@@ -69,16 +69,6 @@ management:
       show-details: when_authorized
 
 # #############################################################################
-# OBSERVABILITY & LOGGING
-# #############################################################################
-logging:
-  level:
-    root: INFO
-    org.springframework.security: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql: TRACE
-
-# #############################################################################
 # INTEGRATIONS: STRIPE PAYMENT GATEWAY
 # Sensitive keys must be injected via secure Environment Variables or Vault.
 # #############################################################################
