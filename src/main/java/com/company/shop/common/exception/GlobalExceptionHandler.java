@@ -82,6 +82,42 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles cases where a requested product does not exist.
+     *
+     * @param ex the domain-specific product not found exception.
+     * @return a 404 Not Found response.
+     */
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<ApiError> handleProductNotFound(ProductNotFoundException ex) {
+        ApiError apiError = new ApiError(HttpStatus.NOT_FOUND.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * Handles cases where a cart is not found for the requested user.
+     *
+     * @param ex the domain-specific cart not found exception.
+     * @return a 404 Not Found response.
+     */
+    @ExceptionHandler(CartNotFoundException.class)
+    public ResponseEntity<ApiError> handleCartNotFound(CartNotFoundException ex) {
+        ApiError apiError = new ApiError(HttpStatus.NOT_FOUND.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * Handles cases where requested quantity exceeds available stock.
+     *
+     * @param ex the domain-specific insufficient stock exception.
+     * @return a 409 Conflict response.
+     */
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ApiError> handleInsufficientStock(InsufficientStockException ex) {
+        ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+    }
+
+    /**
      * Handles authorization failures.
      *
      * @param ex the access denied exception.

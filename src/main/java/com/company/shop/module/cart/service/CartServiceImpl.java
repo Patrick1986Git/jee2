@@ -13,6 +13,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.shop.common.exception.CartNotFoundException;
+import com.company.shop.common.exception.InsufficientStockException;
+import com.company.shop.common.exception.ProductNotFoundException;
 import com.company.shop.module.cart.dto.AddToCartRequestDTO;
 import com.company.shop.module.cart.dto.CartResponseDTO;
 import com.company.shop.module.cart.dto.UpdateCartItemRequestDTO;
@@ -24,8 +27,6 @@ import com.company.shop.module.product.entity.Product;
 import com.company.shop.module.product.repository.ProductRepository;
 import com.company.shop.module.user.entity.User;
 import com.company.shop.module.user.service.UserService;
-
-import jakarta.persistence.EntityNotFoundException;
 
 /**
  * Production implementation of {@link CartService} providing shopping cart management.
@@ -77,8 +78,8 @@ public class CartServiceImpl implements CartService {
      *
      * @param request DTO containing product identifier and quantity.
      * @return updated {@link CartResponseDTO}.
-     * @throws EntityNotFoundException if the requested product does not exist.
-     * @throws IllegalArgumentException if the combined quantity exceeds warehouse stock.
+     * @throws ProductNotFoundException if the requested product does not exist.
+     * @throws InsufficientStockException if the combined quantity exceeds warehouse stock.
      */
     @Override
     public CartResponseDTO addToCart(AddToCartRequestDTO request) {
@@ -86,7 +87,7 @@ public class CartServiceImpl implements CartService {
         Cart cart = getOrCreateCart(user);
         
         Product product = productRepository.findById(request.productId())
-                .orElseThrow(() -> new EntityNotFoundException("Product not found: " + request.productId()));
+                .orElseThrow(() -> new ProductNotFoundException("Product not found: " + request.productId()));
 
         int currentInCart = cart.getItems().stream()
                 .filter(item -> item.getProduct().getId().equals(request.productId()))
@@ -94,7 +95,7 @@ public class CartServiceImpl implements CartService {
                 .sum();
 
         if (product.getStock() < (currentInCart + request.quantity())) {
-            throw new IllegalArgumentException("Insufficient stock. Available: " + product.getStock() + ", in cart: " + currentInCart);
+            throw new InsufficientStockException("Insufficient stock. Available: " + product.getStock() + ", in cart: " + currentInCart);
         }
 
         cart.addItem(product, request.quantity());
@@ -107,10 +108,10 @@ public class CartServiceImpl implements CartService {
         Cart cart = getOrCreateCart(user);
 
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
+                .orElseThrow(() -> new ProductNotFoundException("Product not found: " + productId));
         
         if (product.getStock() < request.quantity()) {
-            throw new IllegalArgumentException("Insufficient stock available");
+            throw new InsufficientStockException("Insufficient stock available");
         }
 
         cart.updateItemQuantity(productId, request.quantity());
@@ -142,13 +143,13 @@ public class CartServiceImpl implements CartService {
      *
      * @param userId unique identifier of the user.
      * @return the {@link Cart} entity.
-     * @throws EntityNotFoundException if no cart is associated with the user.
+     * @throws CartNotFoundException if no cart is associated with the user.
      */
     @Override
     @Transactional(readOnly = true)
     public Cart getCartEntityForUser(UUID userId) {
         return cartRepository.findByUserIdWithItems(userId)
-                .orElseThrow(() -> new EntityNotFoundException("Cart not found for user: " + userId));
+                .orElseThrow(() -> new CartNotFoundException("Cart not found for user: " + userId));
     }
 
     /**
