@@ -10,6 +10,8 @@ package com.company.shop.module.order.service;
 
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,8 @@ import jakarta.annotation.PostConstruct;
  */
 @Service
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final Logger log = LoggerFactory.getLogger(PaymentServiceImpl.class);
 
     @Value("${stripe.api-key}")
     private String secretKey;
@@ -84,7 +88,7 @@ public class PaymentServiceImpl implements PaymentService {
      *
      * @param order the order aggregate for which payment is being requested.
      * @return {@link PaymentIntentResponseDTO} containing the client secret for front-end SDK.
-     * @throws RuntimeException if the Stripe API request fails.
+     * @throws IllegalStateException if the Stripe API request fails.
      */
     @Override
     public PaymentIntentResponseDTO createPaymentIntent(Order order) {
@@ -98,7 +102,7 @@ public class PaymentServiceImpl implements PaymentService {
             PaymentIntent intent = PaymentIntent.create(params);
             return new PaymentIntentResponseDTO(intent.getClientSecret(), publicKey);
         } catch (Exception e) {
-            throw new RuntimeException("Error creating Stripe PaymentIntent", e);
+            throw new IllegalStateException("Error creating Stripe PaymentIntent: " + e.getMessage(), e);
         }
     }
 
@@ -111,7 +115,7 @@ public class PaymentServiceImpl implements PaymentService {
      *
      * @param payload   raw JSON payload from the request body.
      * @param sigHeader the {@code Stripe-Signature} header for event verification.
-     * @throws RuntimeException if the signature is invalid or processing fails.
+     * @throws IllegalStateException if the signature is invalid or processing fails.
      */
     @Override
     @Transactional
@@ -134,9 +138,8 @@ public class PaymentServiceImpl implements PaymentService {
                 }
             }
         } catch (Exception e) {
-            // In a production environment, consider using a formal SLF4J logger
-            System.err.println("Webhook error: " + e.getMessage());
-            throw new RuntimeException("Stripe webhook processing error", e);
+            log.error("Stripe webhook processing error: {}", e.getMessage(), e);
+            throw new IllegalStateException("Stripe webhook processing error: " + e.getMessage(), e);
         }
     }
 }
