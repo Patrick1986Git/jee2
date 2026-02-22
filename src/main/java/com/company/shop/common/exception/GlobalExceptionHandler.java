@@ -4,7 +4,6 @@
 
 package com.company.shop.common.exception;
 
-import java.nio.file.AccessDeniedException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,10 +11,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -90,6 +91,43 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
         ApiError apiError = new ApiError(HttpStatus.FORBIDDEN.value(), "Insufficient permissions to access this resource");
         return new ResponseEntity<>(apiError, HttpStatus.FORBIDDEN);
+    }
+
+    /**
+     * Handles invalid argument exceptions (e.g., duplicate SKU, category name already exists).
+     *
+     * @param ex the exception describing the invalid input.
+     * @return a 400 Bad Request response.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex) {
+        ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Handles illegal state exceptions (e.g., empty cart on checkout, insufficient stock).
+     *
+     * @param ex the exception describing the conflicting state.
+     * @return a 409 Conflict response.
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiError> handleIllegalState(IllegalStateException ex) {
+        ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Handles requests targeting undefined endpoints.
+     *
+     * @param ex the exception for a missing request mapping.
+     * @return a 404 Not Found response.
+     */
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ApiError> handleNoHandlerFound(NoHandlerFoundException ex) {
+        ApiError apiError = new ApiError(HttpStatus.NOT_FOUND.value(),
+                "No endpoint found for: " + ex.getHttpMethod() + " " + ex.getRequestURL());
+        return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
     }
 
     /**
