@@ -37,7 +37,7 @@ public class UserServiceImpl implements UserService {
 	@Override
 	@Transactional(readOnly = true)
 	public UserResponseDTO findById(UUID id) {
-		return repository.findById(id).map(mapper::toDto)
+		return repository.findWithRolesById(id).map(mapper::toDto)
 				.orElseThrow(() -> new EntityNotFoundException("Użytkownik o ID: " + id + " nie został znaleziony"));
 	}
 
@@ -48,7 +48,7 @@ public class UserServiceImpl implements UserService {
 		// JwtAuthenticationFilter
 		String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
-		return repository.findByEmail(email).map(mapper::toDto).orElseThrow(
+		return repository.findByEmailWithRoles(email).map(mapper::toDto).orElseThrow(
 				() -> new EntityNotFoundException("Nie znaleziono profilu zalogowanego użytkownika: " + email));
 	}
 
@@ -78,7 +78,7 @@ public class UserServiceImpl implements UserService {
 	@Transactional(readOnly = true)
 	public User getCurrentUserEntity() {
 		String email = SecurityContextHolder.getContext().getAuthentication().getName();
-		return repository.findByEmail(email)
+		return repository.findByEmailWithRoles(email)
 				.orElseThrow(() -> new EntityNotFoundException("Nie znaleziono użytkownika: " + email));
 	}
 }
