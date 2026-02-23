@@ -94,7 +94,7 @@ public class CartServiceImpl implements CartService {
                 .sum();
 
         if (product.getStock() < (currentInCart + request.quantity())) {
-            throw new IllegalArgumentException("Insufficient stock. Available: " + product.getStock() + ", in cart: " + currentInCart);
+            throw new IllegalStateException("Insufficient stock. Available: " + product.getStock() + ", in cart: " + currentInCart);
         }
 
         cart.addItem(product, request.quantity());
@@ -107,10 +107,10 @@ public class CartServiceImpl implements CartService {
         Cart cart = getOrCreateCart(user);
 
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
-        
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + productId));
+
         if (product.getStock() < request.quantity()) {
-            throw new IllegalArgumentException("Insufficient stock available");
+            throw new IllegalStateException("Insufficient stock. Available: " + product.getStock());
         }
 
         cart.updateItemQuantity(productId, request.quantity());

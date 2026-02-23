@@ -121,8 +121,8 @@ public class OrderServiceImpl implements OrderService {
 
         if (request.discountCode() != null && !request.discountCode().isBlank()) {
             DiscountCode dc = discountCodeRepo.findByCodeIgnoreCaseAndDeletedFalse(request.discountCode().trim())
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid or expired discount code"));
-            
+                    .orElseThrow(() -> new EntityNotFoundException("Discount code not found: " + request.discountCode().trim()));
+
             order.applyDiscount(dc);
         }
 

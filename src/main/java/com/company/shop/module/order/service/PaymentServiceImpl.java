@@ -10,6 +10,8 @@ package com.company.shop.module.order.service;
 
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,8 @@ import jakarta.annotation.PostConstruct;
  */
 @Service
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final Logger log = LoggerFactory.getLogger(PaymentServiceImpl.class);
 
     @Value("${stripe.api-key}")
     private String secretKey;
@@ -134,8 +138,7 @@ public class PaymentServiceImpl implements PaymentService {
                 }
             }
         } catch (Exception e) {
-            // In a production environment, consider using a formal SLF4J logger
-            System.err.println("Webhook error: " + e.getMessage());
+            log.error("Stripe webhook processing error: {}", e.getMessage(), e);
             throw new RuntimeException("Stripe webhook processing error", e);
         }
     }

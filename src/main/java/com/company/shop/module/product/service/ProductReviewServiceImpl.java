@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2026 Your Company Name. All rights reserved.
+ *
+ * This software is the confidential and proprietary information of Your Company Name.
+ * You shall not disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into with Your Company.
+ */
+
 package com.company.shop.module.product.service;
 
 import java.util.UUID;
@@ -19,79 +27,122 @@ import com.company.shop.module.user.service.UserService;
 
 import jakarta.persistence.EntityNotFoundException;
 
+/**
+ * Production implementation of {@link ProductReviewService} managing customer product reviews.
+ * <p>
+ * This service enforces business rules such as preventing duplicate reviews per user,
+ * enforcing ownership-based deletion, and synchronizing product rating statistics
+ * after each review modification within a single transaction.
+ * </p>
+ *
+ * @since 1.0.0
+ */
 @Service
 @Transactional
 public class ProductReviewServiceImpl implements ProductReviewService {
 
-	private final ProductReviewRepository reviewRepo;
-	private final ProductRepository productRepo;
-	private final UserService userService;
+    private final ProductReviewRepository reviewRepo;
+    private final ProductRepository productRepo;
+    private final UserService userService;
 
-	public ProductReviewServiceImpl(ProductReviewRepository reviewRepo, ProductRepository productRepo, UserService userService) {
-		this.reviewRepo = reviewRepo;
-		this.productRepo = productRepo;
-		this.userService = userService;
-	}
+    /**
+     * Constructs the service with required dependencies.
+     *
+     * @param reviewRepo  repository for review persistence.
+     * @param productRepo repository for product rating updates.
+     * @param userService service for current user context.
+     */
+    public ProductReviewServiceImpl(ProductReviewRepository reviewRepo, ProductRepository productRepo, UserService userService) {
+        this.reviewRepo = reviewRepo;
+        this.productRepo = productRepo;
+        this.userService = userService;
+    }
 
-	@Override
-	public ProductReviewResponseDTO addReview(ProductReviewRequestDTO dto) {
-	    User user = userService.getCurrentUserEntity();
+    /**
+     * Adds a new review for a product on behalf of the current user.
+     * <p>
+     * Enforces a one-review-per-user policy and recalculates product rating statistics
+     * after the review is persisted.
+     * </p>
+     *
+     * @param dto the review data including product identifier, rating, and comment.
+     * @return the persisted review details.
+     * @throws IllegalStateException   if the user has already reviewed this product.
+     * @throws EntityNotFoundException if the specified product does not exist.
+     */
+    @Override
+    public ProductReviewResponseDTO addReview(ProductReviewRequestDTO dto) {
+        User user = userService.getCurrentUserEntity();
 
-	    if (reviewRepo.existsByProductIdAndUserId(dto.productId(), user.getId())) {
-	        throw new IllegalStateException("Już dodałeś opinię do tego produktu.");
-	    }
+        if (reviewRepo.existsByProductIdAndUserId(dto.productId(), user.getId())) {
+            throw new IllegalStateException("You have already reviewed this product.");
+        }
 
-	    Product product = productRepo.findById(dto.productId())
-	            .orElseThrow(() -> new EntityNotFoundException("Produkt nie istnieje"));
+        Product product = productRepo.findById(dto.productId())
+                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + dto.productId()));
 
-	    // 1. Zapisz nową recenzję
-	    ProductReview review = new ProductReview(product, user, dto.rating(), dto.comment());
-	    ProductReview saved = reviewRepo.save(review);
+        ProductReview review = new ProductReview(product, user, dto.rating(), dto.comment());
+        ProductReview saved = reviewRepo.save(review);
 
-	    // 2. Zaktualizuj statystyki produktu
-	    updateProductRatingStats(product);
+        updateProductRatingStats(product);
 
-	    return mapToResponse(saved);
-	}
+        return mapToResponse(saved);
+    }
 
-	@Override
-	@Transactional(readOnly = true)
-	public Page<ProductReviewResponseDTO> getProductReviews(UUID productId, Pageable pageable) {
-		return reviewRepo.findByProductId(productId, pageable).map(this::mapToResponse);
-	}
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductReviewResponseDTO> getProductReviews(UUID productId, Pageable pageable) {
+        return reviewRepo.findByProductId(productId, pageable).map(this::mapToResponse);
+    }
 
-	@Override
-	public void deleteReview(UUID reviewId) {
-	    ProductReview review = reviewRepo.findById(reviewId)
-	            .orElseThrow(() -> new EntityNotFoundException("Opinia nie istnieje"));
+    /**
+     * Deletes a review by its identifier.
+     * <p>
+     * Verifies that the current user is either the review author or an administrator.
+     * Recalculates product rating statistics after deletion.
+     * </p>
+     *
+     * @param reviewId the identifier of the review to delete.
+     * @throws EntityNotFoundException if the review does not exist.
+     * @throws AccessDeniedException   if the current user is not the author or an admin.
+     */
+    @Override
+    public void deleteReview(UUID reviewId) {
+        ProductReview review = reviewRepo.findById(reviewId)
+                .orElseThrow(() -> new EntityNotFoundException("Review not found with ID: " + reviewId));
 
-	    // ... (Twoja logika uprawnień) ...
+        User currentUser = userService.getCurrentUserEntity();
+        boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
 
-	    Product product = review.getProduct();
-	    reviewRepo.delete(review);
+        if (!isAdmin && !review.getUser().getId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("You are not authorized to delete this review.");
+        }
 
-	    // 2. Po usunięciu również aktualizujemy statystyki
-	    updateProductRatingStats(product);
-	}
+        Product product = review.getProduct();
+        reviewRepo.delete(review);
 
-	/**
-	 * Enterprise Grade approach: Przeliczanie statystyk.
-	 * W skali miliona rekordów można to robić asynchronicznie, 
-	 * ale przy starcie projektu @Transactional w zupełności wystarczy.
-	 */
-	private void updateProductRatingStats(Product product) {
-	    // Pobieramy dane agregujące bezpośrednio z bazy dla spójności
-	    // Możesz dodać dedykowaną metodę do ProductReviewRepository
-	    Double avg = reviewRepo.getAverageRatingForProduct(product.getId());
-	    long count = reviewRepo.countByProductIdAndDeletedFalse(product.getId());
+        updateProductRatingStats(product);
+    }
 
-	    product.updateRatings(avg != null ? avg : 0.0, (int) count);
-	    productRepo.save(product);
-	}
+    /**
+     * Recalculates and persists the average rating and review count for a product.
+     * <p>
+     * Aggregates are fetched directly from the database to ensure consistency.
+     * </p>
+     *
+     * @param product the product whose rating statistics should be updated.
+     */
+    private void updateProductRatingStats(Product product) {
+        Double avg = reviewRepo.getAverageRatingForProduct(product.getId());
+        long count = reviewRepo.countByProductIdAndDeletedFalse(product.getId());
 
-	private ProductReviewResponseDTO mapToResponse(ProductReview review) {
-		return new ProductReviewResponseDTO(review.getId(),
-				review.getUser().getFirstName() + " " + review.getUser().getLastName(), review.getRating(),
-				review.getComment(), review.getCreatedAt());
-	}
+        product.updateRatings(avg != null ? avg : 0.0, (int) count);
+        productRepo.save(product);
+    }
+
+    private ProductReviewResponseDTO mapToResponse(ProductReview review) {
+        return new ProductReviewResponseDTO(review.getId(),
+                review.getUser().getFirstName() + " " + review.getUser().getLastName(), review.getRating(),
+                review.getComment(), review.getCreatedAt());
+    }
 }
