@@ -11,38 +11,42 @@ package com.company.shop.common.exception;
 import java.time.LocalDateTime;
 
 /**
- * Standardized API error response container.
+ * Standardized API error response container for production-grade applications.
  * <p>
  * This record ensures that all error responses across the system maintain 
- * a consistent structure, facilitating easier error handling for client applications.
+ * a consistent structure. The addition of {@code errorCode} allows client 
+ * applications to perform programmatic logic based on specific error types 
+ * rather than parsing human-readable messages.
  * </p>
  *
- * @param status    the HTTP status code value.
- * @param message   a human-readable description of the error.
- * @param errors    optional detailed error information (e.g., field-level validation errors).
- * @param timestamp the exact time the error occurred in the server's local time.
- * @since 1.0.0
+ * @param status    the HTTP status code value (e.g., 400, 404, 500).
+ * @param message   a human-readable description of the error (may be localized).
+ * @param errorCode a unique, machine-readable string identifying the specific error (e.g., "USER_NOT_FOUND").
+ * @param errors    optional detailed information (e.g., field-level validation errors).
+ * @param timestamp the exact time the error occurred.
+ * @since 1.1.0
  */
-public record ApiError(int status, String message, Object errors, LocalDateTime timestamp) {
+public record ApiError(
+        int status,
+        String message,
+        String errorCode,
+        Object errors,
+        LocalDateTime timestamp
+) {
 
-    /**
-     * Compact constructor for general application errors (e.g., 404 Not Found, 500 Internal Error).
-     *
-     * @param status  the HTTP status code.
-     * @param message description of the error.
-     */
     public ApiError(int status, String message) {
-        this(status, message, null, LocalDateTime.now());
+        this(status, message, null, null, LocalDateTime.now());
     }
 
-    /**
-     * Specialized constructor for validation-related errors (e.g., 400 Bad Request).
-     *
-     * @param status  the HTTP status code.
-     * @param message overview of the validation failure.
-     * @param errors  collection of field-specific error messages.
-     */
+    public ApiError(int status, String message, String errorCode) {
+        this(status, message, errorCode, null, LocalDateTime.now());
+    }
+
+    public ApiError(int status, String message, String errorCode, Object errors) {
+        this(status, message, errorCode, errors, LocalDateTime.now());
+    }
+
     public ApiError(int status, String message, Object errors) {
-        this(status, message, errors, LocalDateTime.now());
+        this(status, message, "VALIDATION_FAILED", errors, LocalDateTime.now());
     }
 }

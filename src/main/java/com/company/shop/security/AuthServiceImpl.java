@@ -7,12 +7,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.company.shop.common.exception.UserAlreadyExistsException;
 import com.company.shop.module.user.dto.AuthResponseDTO;
 import com.company.shop.module.user.dto.LoginRequestDTO;
 import com.company.shop.module.user.dto.RegisterRequestDTO;
 import com.company.shop.module.user.entity.Role;
 import com.company.shop.module.user.entity.User;
+import com.company.shop.module.user.exception.UserAlreadyExistsException;
 import com.company.shop.module.user.repository.RoleRepository;
 import com.company.shop.module.user.repository.UserRepository;
 import com.company.shop.security.jwt.JwtTokenProvider;
