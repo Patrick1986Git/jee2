@@ -1,5 +1,9 @@
 /*
  * Copyright (c) 2026 Your Company Name. All rights reserved.
+ *
+ * This software is the confidential and proprietary information of Your Company Name.
+ * You shall not disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into with Your Company.
  */
 
 package com.company.shop.common.exception;
@@ -58,7 +62,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles conflicts during entity creation (e.g., unique constraint violations).
+     * Handles conflicts during user registration (e.g., email already in use).
      *
      * @param ex the domain-specific exception for existing users.
      * @return a 409 Conflict response.
@@ -67,6 +71,81 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleUserAlreadyExists(UserAlreadyExistsException ex) {
         ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(), ex.getMessage());
         return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Handles conflicts when a resource with the same unique identifier already exists
+     * (e.g., duplicate product SKU or category name).
+     *
+     * @param ex the domain-specific exception for duplicate resources.
+     * @return a 409 Conflict response.
+     */
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<ApiError> handleDuplicateResource(DuplicateResourceException ex) {
+        ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Handles order placement attempts when the shopping cart is empty.
+     *
+     * @param ex the domain-specific exception for an empty cart.
+     * @return a 409 Conflict response.
+     */
+    @ExceptionHandler(EmptyCartException.class)
+    public ResponseEntity<ApiError> handleEmptyCart(EmptyCartException ex) {
+        ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Handles cart and order operations rejected due to insufficient product stock.
+     *
+     * @param ex the domain-specific exception for stock shortages.
+     * @return a 409 Conflict response.
+     */
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ApiError> handleInsufficientStock(InsufficientStockException ex) {
+        ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Handles checkout failures caused by an invalid or expired discount code.
+     *
+     * @param ex the domain-specific exception for bad discount codes.
+     * @return a 422 Unprocessable Entity response.
+     */
+    @ExceptionHandler(InvalidDiscountCodeException.class)
+    public ResponseEntity<ApiError> handleInvalidDiscountCode(InvalidDiscountCodeException ex) {
+        ApiError apiError = new ApiError(HttpStatus.UNPROCESSABLE_ENTITY.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    /**
+     * Handles attempts to submit a second review for the same product.
+     *
+     * @param ex the domain-specific exception for duplicate product reviews.
+     * @return a 409 Conflict response.
+     */
+    @ExceptionHandler(ReviewAlreadyExistsException.class)
+    public ResponseEntity<ApiError> handleReviewAlreadyExists(ReviewAlreadyExistsException ex) {
+        ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(), ex.getMessage());
+        return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+    }
+
+    /**
+     * Handles failures originating from the external payment gateway.
+     *
+     * @param ex the domain-specific exception wrapping payment provider errors.
+     * @return a 502 Bad Gateway response.
+     */
+    @ExceptionHandler(PaymentProcessingException.class)
+    public ResponseEntity<ApiError> handlePaymentProcessing(PaymentProcessingException ex) {
+        log.error("Payment gateway error: ", ex);
+        ApiError apiError = new ApiError(HttpStatus.BAD_GATEWAY.value(),
+                "Payment processing failed. Please try again or contact support.");
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_GATEWAY);
     }
 
     /**
@@ -94,7 +173,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles invalid argument exceptions (e.g., duplicate SKU, category name already exists).
+     * Handles invalid argument exceptions as a fallback for unclassified bad input.
      *
      * @param ex the exception describing the invalid input.
      * @return a 400 Bad Request response.
@@ -106,7 +185,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles illegal state exceptions (e.g., empty cart on checkout, insufficient stock).
+     * Handles illegal state exceptions as a fallback for unclassified state conflicts.
      *
      * @param ex the exception describing the conflicting state.
      * @return a 409 Conflict response.

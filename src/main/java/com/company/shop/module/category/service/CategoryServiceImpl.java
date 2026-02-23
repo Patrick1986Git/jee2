@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2026 Your Company Name. All rights reserved.
+ *
+ * This software is the confidential and proprietary information of Your Company Name.
+ * You shall not disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into with Your Company.
+ */
+
 package com.company.shop.module.category.service;
 
 import java.util.UUID;
@@ -10,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.shop.common.exception.DuplicateResourceException;
 import com.company.shop.module.category.dto.CategoryCreateDTO;
 import com.company.shop.module.category.dto.CategoryResponseDTO;
 import com.company.shop.module.category.entity.Category;
@@ -18,90 +27,128 @@ import com.company.shop.module.category.repository.CategoryRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 
+/**
+ * Production implementation of {@link CategoryService} providing category lifecycle management.
+ * <p>
+ * This service handles hierarchical category structures, SEO-friendly slug generation
+ * with Polish character normalization, and enforces unique category name constraints.
+ * </p>
+ *
+ * @since 1.0.0
+ */
 @Service
 @Transactional
 public class CategoryServiceImpl implements CategoryService {
 
-    private final CategoryRepository repo;
-    private final CategoryMapper mapper;
+    private final CategoryRepository categoryRepository;
+    private final CategoryMapper categoryMapper;
 
-    // Pattern do usuwania znaków specjalnych przy generowaniu sluga
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
 
-    public CategoryServiceImpl(CategoryRepository repo, CategoryMapper mapper) {
-        this.repo = repo;
-        this.mapper = mapper;
+    /**
+     * Constructs the service with required dependencies.
+     *
+     * @param categoryRepository repository for category persistence.
+     * @param categoryMapper     mapper for DTO transformation.
+     */
+    public CategoryServiceImpl(CategoryRepository categoryRepository, CategoryMapper categoryMapper) {
+        this.categoryRepository = categoryRepository;
+        this.categoryMapper = categoryMapper;
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<CategoryResponseDTO> findAll(Pageable pageable) {
-        return repo.findAll(pageable).map(mapper::toDto);
+        return categoryRepository.findAll(pageable).map(categoryMapper::toDto);
     }
 
     @Override
     @Transactional(readOnly = true)
     public CategoryResponseDTO findById(UUID id) {
-        return repo.findById(id)
-                .map(mapper::toDto)
-                .orElseThrow(() -> new EntityNotFoundException("Kategoria nie znaleziona"));
+        return categoryRepository.findById(id)
+                .map(categoryMapper::toDto)
+                .orElseThrow(() -> new EntityNotFoundException("Category not found with ID: " + id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public CategoryResponseDTO findBySlug(String slug) {
-        return repo.findBySlug(slug)
-                .map(mapper::toDto)
-                .orElseThrow(() -> new EntityNotFoundException("Kategoria o slugu: " + slug + " nie istnieje"));
+        return categoryRepository.findBySlug(slug)
+                .map(categoryMapper::toDto)
+                .orElseThrow(() -> new EntityNotFoundException("Category not found with slug: " + slug));
     }
 
+    /**
+     * Creates a new category and optionally links it to a parent category.
+     * <p>
+     * Generates an SEO-friendly slug from the category name and enforces
+     * uniqueness of category names.
+     * </p>
+     *
+     * @param dto the category creation data.
+     * @return the persisted category details.
+     * @throws DuplicateResourceException if a category with the given name already exists.
+     * @throws EntityNotFoundException    if the specified parent category does not exist.
+     */
     @Override
     public CategoryResponseDTO create(CategoryCreateDTO dto) {
-        if (repo.existsByName(dto.getName())) {
-            throw new IllegalArgumentException("Kategoria o tej nazwie już istnieje");
+        if (categoryRepository.existsByName(dto.getName())) {
+            throw new DuplicateResourceException("Category with name '" + dto.getName() + "' already exists");
         }
 
         String slug = generateSlug(dto.getName());
-        
-        // Obsługa kategorii nadrzędnej (jeśli podano parentId)
+
         Category parent = null;
         if (dto.getParentId() != null) {
-            parent = repo.findById(dto.getParentId())
-                    .orElseThrow(() -> new EntityNotFoundException("Kategoria nadrzędna nie istnieje"));
+            parent = categoryRepository.findById(dto.getParentId())
+                    .orElseThrow(() -> new EntityNotFoundException("Parent category not found with ID: " + dto.getParentId()));
         }
 
         Category category = new Category(dto.getName(), slug, dto.getDescription(), parent);
-        return mapper.toDto(repo.save(category));
+        return categoryMapper.toDto(categoryRepository.save(category));
     }
 
+    /**
+     * Updates an existing category's metadata and optional parent link.
+     *
+     * @param id  the identifier of the category to update.
+     * @param dto the new category data.
+     * @return the updated category details.
+     * @throws EntityNotFoundException if the category or specified parent does not exist.
+     */
     @Override
     public CategoryResponseDTO update(UUID id, CategoryCreateDTO dto) {
-        Category category = repo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Kategoria nie istnieje"));
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Category not found with ID: " + id));
 
         Category parent = null;
         if (dto.getParentId() != null) {
-            parent = repo.findById(dto.getParentId())
-                    .orElseThrow(() -> new EntityNotFoundException("Kategoria nadrzędna nie istnieje"));
+            parent = categoryRepository.findById(dto.getParentId())
+                    .orElseThrow(() -> new EntityNotFoundException("Parent category not found with ID: " + dto.getParentId()));
         }
 
         String newSlug = generateSlug(dto.getName());
         category.update(dto.getName(), newSlug, dto.getDescription(), parent);
-        
-        return mapper.toDto(category);
+
+        return categoryMapper.toDto(category);
     }
 
     @Override
     public void delete(UUID id) {
-        Category category = repo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Category not found"));
-        category.delete(); // Używamy metody z Twojej encji
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Category not found with ID: " + id));
+        category.delete();
     }
 
     /**
-     * Prywatna metoda pomocnicza do generowania "przyjaznych adresów URL"
-     * Przykład: "Telefony i Akcesoria" -> "telefony-i-akcesoria"
+     * Transforms a raw string into an SEO-compliant URL slug.
+     * <p>
+     * Example: "Telefony i Akcesoria" → "telefony-i-akcesoria"
+     * </p>
+     *
+     * @param input the string to slugify.
+     * @return a normalized, lowercase, hyphenated string.
      */
     private String generateSlug(String input) {
         String nowhitespace = WHITESPACE.matcher(input).replaceAll("-");

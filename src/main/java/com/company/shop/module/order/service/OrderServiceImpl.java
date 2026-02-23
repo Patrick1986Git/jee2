@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.company.shop.module.cart.entity.Cart;
 import com.company.shop.module.cart.entity.CartItem;
 import com.company.shop.module.cart.service.CartService;
+import com.company.shop.common.exception.EmptyCartException;
+import com.company.shop.common.exception.InvalidDiscountCodeException;
 import com.company.shop.module.order.dto.OrderCheckoutRequestDTO;
 import com.company.shop.module.order.dto.OrderDetailedResponseDTO;
 import com.company.shop.module.order.dto.OrderResponseDTO;
@@ -104,7 +106,7 @@ public class OrderServiceImpl implements OrderService {
         Cart cart = cartService.getCartEntityForUser(user.getId());
 
         if (cart.getItems().isEmpty()) {
-            throw new IllegalStateException("Cannot place order: Cart is empty.");
+            throw new EmptyCartException("Cannot place order: cart is empty.");
         }
 
         Order order = new Order(user);
@@ -121,7 +123,7 @@ public class OrderServiceImpl implements OrderService {
 
         if (request.discountCode() != null && !request.discountCode().isBlank()) {
             DiscountCode dc = discountCodeRepo.findByCodeIgnoreCaseAndDeletedFalse(request.discountCode().trim())
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid or expired discount code"));
+                    .orElseThrow(() -> new InvalidDiscountCodeException("Invalid or expired discount code: " + request.discountCode().trim()));
             
             order.applyDiscount(dc);
         }

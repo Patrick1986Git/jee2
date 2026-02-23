@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.shop.common.exception.DuplicateResourceException;
 import com.company.shop.module.category.entity.Category;
 import com.company.shop.module.category.repository.CategoryRepository;
 import com.company.shop.module.product.dto.ProductCreateDTO;
@@ -105,7 +106,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public ProductResponseDTO create(ProductCreateDTO dto) {
         if (productRepo.existsBySku(dto.getSku())) {
-            throw new IllegalArgumentException("Product with SKU " + dto.getSku() + " already exists");
+            throw new DuplicateResourceException("Product with SKU '" + dto.getSku() + "' already exists");
         }
 
         Category category = categoryRepo.findById(dto.getCategoryId())

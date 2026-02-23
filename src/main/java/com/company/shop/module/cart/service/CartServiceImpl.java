@@ -13,6 +13,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.shop.common.exception.InsufficientStockException;
 import com.company.shop.module.cart.dto.AddToCartRequestDTO;
 import com.company.shop.module.cart.dto.CartResponseDTO;
 import com.company.shop.module.cart.dto.UpdateCartItemRequestDTO;
@@ -94,7 +95,7 @@ public class CartServiceImpl implements CartService {
                 .sum();
 
         if (product.getStock() < (currentInCart + request.quantity())) {
-            throw new IllegalArgumentException("Insufficient stock. Available: " + product.getStock() + ", in cart: " + currentInCart);
+            throw new InsufficientStockException("Insufficient stock. Available: " + product.getStock() + ", in cart: " + currentInCart);
         }
 
         cart.addItem(product, request.quantity());
@@ -110,7 +111,7 @@ public class CartServiceImpl implements CartService {
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
         
         if (product.getStock() < request.quantity()) {
-            throw new IllegalArgumentException("Insufficient stock available");
+            throw new InsufficientStockException("Insufficient stock available");
         }
 
         cart.updateItemQuantity(productId, request.quantity());
