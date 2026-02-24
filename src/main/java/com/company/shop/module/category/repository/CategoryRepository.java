@@ -8,12 +8,57 @@ import org.springframework.stereotype.Repository;
 
 import com.company.shop.module.category.entity.Category;
 
+/**
+ * Repository interface for {@link Category} entity persistence management.
+ * <p>
+ * Provides specialized query methods for slug-based lookups and existence checks 
+ * to support business validation rules.
+ * </p>
+ *
+ * @since 1.0.0
+ */
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
-	Optional<Category> findBySlug(String slug);
+    /**
+     * Retrieves a category by its URL-friendly slug.
+     *
+     * @param slug the slug to search for.
+     * @return an {@link Optional} containing the found category, or empty if none matches.
+     */
+    Optional<Category> findBySlug(String slug);
 
-	boolean existsByName(String name);
+    /**
+     * Checks if a category exists with the given name.
+     *
+     * @param name the name to check.
+     * @return true if name exists, false otherwise.
+     */
+    boolean existsByName(String name);
 
-	boolean existsBySlug(String slug);
+    /**
+     * Checks if a category exists with the given slug.
+     *
+     * @param slug the slug to check.
+     * @return true if slug exists, false otherwise.
+     */
+    boolean existsBySlug(String slug);
+
+    /**
+     * Validates name uniqueness during updates, excluding a specific category ID.
+     *
+     * @param name the name to check.
+     * @param id   the ID of the category being updated.
+     * @return true if another category already uses this name.
+     */
+    boolean existsByNameAndIdNot(String name, UUID id);
+
+    /**
+     * Validates slug uniqueness during updates, excluding a specific category ID.
+     *
+     * @param slug the slug to check.
+     * @param id   the ID of the category being updated.
+     * @return true if another category already uses this slug.
+     */
+    boolean existsBySlugAndIdNot(String slug, UUID id);
 }
