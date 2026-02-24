@@ -12,7 +12,6 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +26,11 @@ import com.company.shop.module.order.entity.DiscountCode;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderItem;
 import com.company.shop.module.order.entity.Payment;
+import com.company.shop.module.order.exception.DiscountCodeInvalidException;
+import com.company.shop.module.order.exception.EmptyCartCheckoutException;
+import com.company.shop.module.order.exception.OrderAccessDeniedException;
+import com.company.shop.module.order.exception.OrderNotFoundException;
+import com.company.shop.module.order.exception.ProductUnavailableForOrderException;
 import com.company.shop.module.order.mapper.OrderMapper;
 import com.company.shop.module.order.repository.DiscountCodeRepository;
 import com.company.shop.module.order.repository.OrderRepository;
@@ -36,7 +40,6 @@ import com.company.shop.module.product.repository.ProductRepository;
 import com.company.shop.module.user.entity.User;
 import com.company.shop.module.user.service.UserService;
 
-import jakarta.persistence.EntityNotFoundException;
 
 /**
  * Production implementation of {@link OrderService} managing high-integrity transactional order placement.
@@ -104,14 +107,18 @@ public class OrderServiceImpl implements OrderService {
         Cart cart = cartService.getCartEntityForUser(user.getId());
 
         if (cart.getItems().isEmpty()) {
-            throw new IllegalStateException("Cannot place order: Cart is empty.");
+            throw new EmptyCartCheckoutException();
         }
 
         Order order = new Order(user);
 
         for (CartItem cartItem : cart.getItems()) {
             Product product = productRepo.findByIdWithLock(cartItem.getProduct().getId())
-                    .orElseThrow(() -> new EntityNotFoundException("Product not found: " + cartItem.getProduct().getId()));
+                    .orElseThrow(() -> new ProductUnavailableForOrderException(cartItem.getProduct().getId()));
+
+            if (product.getStock() < cartItem.getQuantity()) {
+                throw new ProductUnavailableForOrderException(product.getId(), cartItem.getQuantity(), product.getStock());
+            }
 
             product.decreaseStock(cartItem.getQuantity());
 
@@ -120,9 +127,14 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (request.discountCode() != null && !request.discountCode().isBlank()) {
-            DiscountCode dc = discountCodeRepo.findByCodeIgnoreCaseAndDeletedFalse(request.discountCode().trim())
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid or expired discount code"));
-            
+            String normalizedDiscountCode = request.discountCode().trim();
+            DiscountCode dc = discountCodeRepo.findByCodeIgnoreCaseAndDeletedFalse(normalizedDiscountCode)
+                    .orElseThrow(() -> new DiscountCodeInvalidException(normalizedDiscountCode));
+
+            if (!dc.canBeUsed()) {
+                throw new DiscountCodeInvalidException(normalizedDiscountCode);
+            }
+
             order.applyDiscount(dc);
         }
 
@@ -155,13 +167,13 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public OrderDetailedResponseDTO findById(UUID id) {
         Order order = orderRepo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Order not found: " + id));
+                .orElseThrow(() -> new OrderNotFoundException(id));
 
         User currentUser = userService.getCurrentUserEntity();
         boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
         
         if (!isAdmin && !order.getUser().getId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("You are not authorized to view this order.");
+            throw new OrderAccessDeniedException();
         }
         return mapper.toDetailedDto(order);
     }
