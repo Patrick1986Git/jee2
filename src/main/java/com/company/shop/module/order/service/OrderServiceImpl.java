@@ -30,6 +30,7 @@ import com.company.shop.module.order.entity.Payment;
 import com.company.shop.module.order.exception.DiscountCodeInvalidException;
 import com.company.shop.module.order.exception.EmptyCartCheckoutException;
 import com.company.shop.module.order.exception.OrderAccessDeniedException;
+import com.company.shop.module.order.exception.OrderCreationException;
 import com.company.shop.module.order.exception.OrderInsufficientStockException;
 import com.company.shop.module.order.exception.OrderNotFoundException;
 import com.company.shop.module.order.mapper.OrderMapper;
@@ -41,6 +42,7 @@ import com.company.shop.module.product.exception.ProductNotFoundException;
 import com.company.shop.module.product.repository.ProductRepository;
 import com.company.shop.module.user.entity.User;
 import com.company.shop.module.user.service.UserService;
+import com.company.shop.security.SecurityConstants;
 
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,7 +81,15 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderResponseDTO placeOrderFromCart(OrderCheckoutRequestDTO request) {
-        Order savedOrder = transactionTemplate.execute(status -> createPendingOrder(request));
+        UUID orderId = transactionTemplate.execute(status -> createPendingOrder(request));
+
+        if (orderId == null) {
+            throw new OrderCreationException("Failed to create order during checkout.");
+        }
+
+        Order savedOrder = orderRepo.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
         PaymentIntentResponseDTO stripeInfo = paymentService.createPaymentIntent(savedOrder);
 
         OrderResponseDTO baseDto = mapper.toDto(savedOrder);
@@ -91,7 +101,7 @@ public class OrderServiceImpl implements OrderService {
                 stripeInfo);
     }
 
-    private Order createPendingOrder(OrderCheckoutRequestDTO request) {
+    private UUID createPendingOrder(OrderCheckoutRequestDTO request) {
         User user = userService.getCurrentUserEntity();
         Cart cart = cartService.getCartEntityForUser(user.getId());
 
@@ -128,7 +138,7 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = orderRepo.save(order);
         paymentRepo.save(new Payment(savedOrder, "STRIPE", savedOrder.getTotalAmount()));
 
-        return savedOrder;
+        return savedOrder.getId();
     }
 
     @Override
@@ -138,7 +148,8 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new OrderNotFoundException(id));
 
         User currentUser = userService.getCurrentUserEntity();
-        boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> r.getName().equals("ROLE_ADMIN"));
+        boolean isAdmin = currentUser.getRoles().stream()
+                .anyMatch(r -> r.getName().equals(SecurityConstants.ROLE_ADMIN));
 
         if (!isAdmin && !order.getUser().getId().equals(currentUser.getId())) {
             throw new OrderAccessDeniedException();
