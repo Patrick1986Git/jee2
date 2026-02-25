@@ -80,9 +80,10 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional
     public PaymentIntentResponseDTO createPaymentIntent(Order order) {
         try {
-            Payment payment = paymentRepo.findByOrderIdAndDeletedFalse(order.getId())
+            Payment payment = paymentRepo.findByOrderIdForUpdate(order.getId())
                     .orElseThrow(() -> new PaymentProcessingException("Payment record not found for order: " + order.getId()));
 
             if (payment.getProviderPaymentId() != null && !payment.getProviderPaymentId().isBlank()
