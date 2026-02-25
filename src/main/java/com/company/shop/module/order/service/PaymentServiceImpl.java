@@ -22,6 +22,7 @@ import com.company.shop.module.order.exception.OrderNotFoundException;
 import com.company.shop.module.order.exception.PaymentProcessingException;
 import com.company.shop.module.order.exception.StripeConfigurationException;
 import com.company.shop.module.order.exception.WebhookProcessingException;
+import com.company.shop.module.order.exception.WebhookSignatureInvalidException;
 import com.company.shop.module.order.repository.OrderRepository;
 import com.stripe.Stripe;
 import com.stripe.model.PaymentIntent;
@@ -54,6 +55,12 @@ public class PaymentServiceImpl implements PaymentService {
     public void init() {
         if (secretKey == null || secretKey.isBlank()) {
             throw new StripeConfigurationException("Stripe API key is missing in configuration.");
+        }
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            throw new StripeConfigurationException("Stripe webhook secret is missing in configuration.");
+        }
+        if (publicKey == null || publicKey.isBlank()) {
+            throw new StripeConfigurationException("Stripe public key is missing in configuration.");
         }
         Stripe.apiKey = secretKey;
     }
@@ -100,6 +107,9 @@ public class PaymentServiceImpl implements PaymentService {
             Order order = orderRepo.findById(parsedOrderId).orElseThrow(() -> new OrderNotFoundException(parsedOrderId));
             order.markAsPaid();
             orderRepo.save(order);
+        } catch (com.stripe.exception.SignatureVerificationException | IllegalArgumentException ex) {
+            log.warn("Invalid Stripe webhook payload/signature", ex);
+            throw new WebhookSignatureInvalidException();
         } catch (OrderNotFoundException ex) {
             throw ex;
         } catch (Exception e) {

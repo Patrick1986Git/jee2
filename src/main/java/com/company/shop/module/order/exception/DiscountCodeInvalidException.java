@@ -10,6 +10,6 @@ import com.company.shop.common.exception.BusinessException;
 public class DiscountCodeInvalidException extends BusinessException {
 
     public DiscountCodeInvalidException(String code) {
-        super(HttpStatus.CONFLICT, "Invalid or expired discount code: " + code, "DISCOUNT_CODE_INVALID");
+        super(HttpStatus.BAD_REQUEST, "Invalid or expired discount code: " + code, "DISCOUNT_CODE_INVALID");
     }
 }

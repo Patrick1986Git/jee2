@@ -30,7 +30,8 @@ import com.company.shop.module.order.exception.DiscountCodeInvalidException;
 import com.company.shop.module.order.exception.EmptyCartCheckoutException;
 import com.company.shop.module.order.exception.OrderAccessDeniedException;
 import com.company.shop.module.order.exception.OrderNotFoundException;
-import com.company.shop.module.order.exception.ProductUnavailableForOrderException;
+import com.company.shop.module.order.exception.OrderInsufficientStockException;
+import com.company.shop.module.order.exception.OrderProductNotFoundException;
 import com.company.shop.module.order.mapper.OrderMapper;
 import com.company.shop.module.order.repository.DiscountCodeRepository;
 import com.company.shop.module.order.repository.OrderRepository;
@@ -114,10 +115,10 @@ public class OrderServiceImpl implements OrderService {
 
         for (CartItem cartItem : cart.getItems()) {
             Product product = productRepo.findByIdWithLock(cartItem.getProduct().getId())
-                    .orElseThrow(() -> new ProductUnavailableForOrderException(cartItem.getProduct().getId()));
+                    .orElseThrow(() -> new OrderProductNotFoundException(cartItem.getProduct().getId()));
 
             if (product.getStock() < cartItem.getQuantity()) {
-                throw new ProductUnavailableForOrderException(product.getId(), cartItem.getQuantity(), product.getStock());
+                throw new OrderInsufficientStockException(product.getId(), cartItem.getQuantity(), product.getStock());
             }
 
             product.decreaseStock(cartItem.getQuantity());
@@ -138,14 +139,14 @@ public class OrderServiceImpl implements OrderService {
             order.applyDiscount(dc);
         }
 
-        Order savedOrder = orderRepo.save(order);
+        Order savedOrder = orderRepo.saveAndFlush(order);
+
+        PaymentIntentResponseDTO stripeInfo = paymentService.createPaymentIntent(savedOrder);
 
         Payment payment = new Payment(savedOrder, "STRIPE", savedOrder.getTotalAmount());
         paymentRepo.save(payment);
 
         cartService.clearCart();
-        
-        PaymentIntentResponseDTO stripeInfo = paymentService.createPaymentIntent(savedOrder);
 
         OrderResponseDTO baseDto = mapper.toDto(savedOrder);
         return new OrderResponseDTO(
