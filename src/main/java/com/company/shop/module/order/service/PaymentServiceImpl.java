@@ -25,7 +25,9 @@ import com.company.shop.module.order.entity.PaymentStatus;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderStatus;
 import com.company.shop.module.order.exception.OrderNotFoundException;
+import com.company.shop.module.order.exception.PaymentAlreadyCompletedException;
 import com.company.shop.module.order.exception.PaymentProcessingException;
+import com.company.shop.module.order.exception.PaymentRecordNotFoundException;
 import com.company.shop.module.order.exception.StripeConfigurationException;
 import com.company.shop.module.order.exception.WebhookProcessingException;
 import com.company.shop.module.order.exception.WebhookSignatureInvalidException;
@@ -85,10 +87,10 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentIntentResponseDTO createPaymentIntent(Order order) {
         try {
             Payment payment = paymentRepo.findByOrderIdForUpdate(order.getId())
-                    .orElseThrow(() -> new PaymentProcessingException("Payment record not found for order: " + order.getId()));
+                    .orElseThrow(() -> new PaymentRecordNotFoundException(order.getId()));
 
             if (payment.getStatus() == PaymentStatus.COMPLETED) {
-                throw new PaymentProcessingException("Payment already completed for order: " + order.getId());
+                throw new PaymentAlreadyCompletedException(order.getId());
             }
 
             if (payment.getProviderPaymentId() != null && !payment.getProviderPaymentId().isBlank()
@@ -155,7 +157,14 @@ public class PaymentServiceImpl implements PaymentService {
             orderRepo.save(order);
 
             Payment payment = paymentRepo.findByOrderIdForUpdate(order.getId())
-                    .orElseThrow(() -> new PaymentProcessingException("Payment record not found for order: " + order.getId()));
+                    .orElseThrow(() -> new PaymentRecordNotFoundException(order.getId()));
+
+            if (payment.getProviderPaymentId() != null && !payment.getProviderPaymentId().isBlank()
+                    && !payment.getProviderPaymentId().equals(intent.getId())) {
+                throw new WebhookSignatureInvalidException(
+                        "Webhook paymentIntent id does not match stored provider payment id.");
+            }
+
             payment.markAsCompleted();
             paymentRepo.save(payment);
 
