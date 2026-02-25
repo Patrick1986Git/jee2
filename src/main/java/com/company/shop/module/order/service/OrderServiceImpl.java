@@ -13,8 +13,6 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import com.company.shop.module.cart.entity.Cart;
 import com.company.shop.module.cart.entity.CartItem;
@@ -30,7 +28,6 @@ import com.company.shop.module.order.entity.Payment;
 import com.company.shop.module.order.exception.DiscountCodeInvalidException;
 import com.company.shop.module.order.exception.EmptyCartCheckoutException;
 import com.company.shop.module.order.exception.OrderAccessDeniedException;
-import com.company.shop.module.order.exception.OrderCreationException;
 import com.company.shop.module.order.exception.OrderInsufficientStockException;
 import com.company.shop.module.order.exception.OrderNotFoundException;
 import com.company.shop.module.order.mapper.OrderMapper;
@@ -57,7 +54,6 @@ public class OrderServiceImpl implements OrderService {
     private final CartService cartService;
     private final OrderMapper mapper;
     private final PaymentService paymentService;
-    private final TransactionTemplate transactionTemplate;
 
     public OrderServiceImpl(OrderRepository orderRepo,
             ProductRepository productRepo,
@@ -66,8 +62,7 @@ public class OrderServiceImpl implements OrderService {
             UserService userService,
             CartService cartService,
             OrderMapper mapper,
-            PaymentService paymentService,
-            PlatformTransactionManager transactionManager) {
+            PaymentService paymentService) {
         this.orderRepo = orderRepo;
         this.productRepo = productRepo;
         this.paymentRepo = paymentRepo;
@@ -76,20 +71,12 @@ public class OrderServiceImpl implements OrderService {
         this.cartService = cartService;
         this.mapper = mapper;
         this.paymentService = paymentService;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Override
+    @Transactional
     public OrderResponseDTO placeOrderFromCart(OrderCheckoutRequestDTO request) {
-        UUID orderId = transactionTemplate.execute(status -> createPendingOrder(request));
-
-        if (orderId == null) {
-            throw new OrderCreationException("Failed to create order during checkout.");
-        }
-
-        Order savedOrder = orderRepo.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException(orderId));
-
+        Order savedOrder = createPendingOrder(request);
         PaymentIntentResponseDTO stripeInfo = paymentService.createPaymentIntent(savedOrder);
 
         OrderResponseDTO baseDto = mapper.toDto(savedOrder);
@@ -101,7 +88,7 @@ public class OrderServiceImpl implements OrderService {
                 stripeInfo);
     }
 
-    private UUID createPendingOrder(OrderCheckoutRequestDTO request) {
+    private Order createPendingOrder(OrderCheckoutRequestDTO request) {
         User user = userService.getCurrentUserEntity();
         Cart cart = cartService.getCartEntityForUser(user.getId());
 
@@ -138,7 +125,7 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = orderRepo.save(order);
         paymentRepo.save(new Payment(savedOrder, "STRIPE", savedOrder.getTotalAmount()));
 
-        return savedOrder.getId();
+        return savedOrder;
     }
 
     @Override

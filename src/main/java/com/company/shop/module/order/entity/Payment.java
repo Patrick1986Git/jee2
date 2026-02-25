@@ -31,6 +31,12 @@ public class Payment extends SoftDeleteEntity {
 	@Column(nullable = false)
 	private BigDecimal amount;
 
+	@Column(name = "provider_payment_id", length = 255)
+	private String providerPaymentId;
+
+	@Column(name = "client_secret", length = 500)
+	private String clientSecret;
+
 	protected Payment() {
 	}
 
@@ -39,5 +45,34 @@ public class Payment extends SoftDeleteEntity {
 		this.provider = provider;
 		this.amount = amount;
 		this.status = PaymentStatus.PENDING;
+	}
+
+	public Order getOrder() {
+		return order;
+	}
+
+	public PaymentStatus getStatus() {
+		return status;
+	}
+
+	public String getProvider() {
+		return provider;
+	}
+
+	public BigDecimal getAmount() {
+		return amount;
+	}
+
+	public String getProviderPaymentId() {
+		return providerPaymentId;
+	}
+
+	public String getClientSecret() {
+		return clientSecret;
+	}
+
+	public void attachProviderPayment(String providerPaymentId, String clientSecret) {
+		this.providerPaymentId = providerPaymentId;
+		this.clientSecret = clientSecret;
 	}
 }

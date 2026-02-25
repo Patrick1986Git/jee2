@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.company.shop.module.cart.service.CartService;
 import com.company.shop.module.order.dto.PaymentIntentResponseDTO;
+import com.company.shop.module.order.entity.Payment;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderStatus;
 import com.company.shop.module.order.exception.OrderNotFoundException;
@@ -28,6 +29,7 @@ import com.company.shop.module.order.exception.StripeConfigurationException;
 import com.company.shop.module.order.exception.WebhookProcessingException;
 import com.company.shop.module.order.exception.WebhookSignatureInvalidException;
 import com.company.shop.module.order.repository.OrderRepository;
+import com.company.shop.module.order.repository.PaymentRepository;
 import com.stripe.Stripe;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.RequestOptions;
@@ -51,10 +53,12 @@ public class PaymentServiceImpl implements PaymentService {
     private String publicKey;
 
     private final OrderRepository orderRepo;
+    private final PaymentRepository paymentRepo;
     private final CartService cartService;
 
-    public PaymentServiceImpl(OrderRepository orderRepo, CartService cartService) {
+    public PaymentServiceImpl(OrderRepository orderRepo, PaymentRepository paymentRepo, CartService cartService) {
         this.orderRepo = orderRepo;
+        this.paymentRepo = paymentRepo;
         this.cartService = cartService;
     }
 
@@ -78,6 +82,14 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public PaymentIntentResponseDTO createPaymentIntent(Order order) {
         try {
+            Payment payment = paymentRepo.findByOrderIdAndDeletedFalse(order.getId())
+                    .orElseThrow(() -> new PaymentProcessingException("Payment record not found for order: " + order.getId()));
+
+            if (payment.getProviderPaymentId() != null && !payment.getProviderPaymentId().isBlank()
+                    && payment.getClientSecret() != null && !payment.getClientSecret().isBlank()) {
+                return new PaymentIntentResponseDTO(payment.getClientSecret(), publicKey);
+            }
+
             PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
                     .setAmount(order.getTotalAmount().movePointRight(2).longValue())
                     .setCurrency("pln")
@@ -89,7 +101,12 @@ public class PaymentServiceImpl implements PaymentService {
                     .build();
 
             PaymentIntent intent = PaymentIntent.create(params, requestOptions);
+            payment.attachProviderPayment(intent.getId(), intent.getClientSecret());
+            paymentRepo.save(payment);
+
             return new PaymentIntentResponseDTO(intent.getClientSecret(), publicKey);
+        } catch (PaymentProcessingException ex) {
+            throw ex;
         } catch (Exception e) {
             log.error("Stripe PaymentIntent creation failed for orderId={}", order.getId(), e);
             throw new PaymentProcessingException("Failed to initialize payment for order: " + order.getId());

@@ -7,4 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.company.shop.module.order.entity.Payment;
 
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
+	java.util.Optional<Payment> findByOrderIdAndDeletedFalse(UUID orderId);
 }
