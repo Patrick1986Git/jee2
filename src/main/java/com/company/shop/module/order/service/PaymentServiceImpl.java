@@ -30,6 +30,7 @@ import com.company.shop.module.order.exception.WebhookSignatureInvalidException;
 import com.company.shop.module.order.repository.OrderRepository;
 import com.stripe.Stripe;
 import com.stripe.model.PaymentIntent;
+import com.stripe.net.RequestOptions;
 import com.stripe.net.Webhook;
 import com.stripe.param.PaymentIntentCreateParams;
 
@@ -60,12 +61,15 @@ public class PaymentServiceImpl implements PaymentService {
     @PostConstruct
     public void init() {
         if (secretKey == null || secretKey.isBlank()) {
+            log.error("Stripe API key is missing in configuration.");
             throw new StripeConfigurationException("Stripe API key is missing in configuration.");
         }
         if (webhookSecret == null || webhookSecret.isBlank()) {
+            log.error("Stripe webhook secret is missing in configuration.");
             throw new StripeConfigurationException("Stripe webhook secret is missing in configuration.");
         }
         if (publicKey == null || publicKey.isBlank()) {
+            log.error("Stripe public key is missing in configuration.");
             throw new StripeConfigurationException("Stripe public key is missing in configuration.");
         }
         Stripe.apiKey = secretKey;
@@ -80,7 +84,11 @@ public class PaymentServiceImpl implements PaymentService {
                     .putMetadata("orderId", order.getId().toString())
                     .build();
 
-            PaymentIntent intent = PaymentIntent.create(params);
+            RequestOptions requestOptions = RequestOptions.builder()
+                    .setIdempotencyKey("order-payment-intent-" + order.getId())
+                    .build();
+
+            PaymentIntent intent = PaymentIntent.create(params, requestOptions);
             return new PaymentIntentResponseDTO(intent.getClientSecret(), publicKey);
         } catch (Exception e) {
             log.error("Stripe PaymentIntent creation failed for orderId={}", order.getId(), e);
