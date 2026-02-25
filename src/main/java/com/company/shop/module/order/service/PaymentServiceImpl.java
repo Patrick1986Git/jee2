@@ -110,9 +110,11 @@ public class PaymentServiceImpl implements PaymentService {
             }
 
             UUID parsedOrderId = UUID.fromString(orderId);
-            Order order = orderRepo.findById(parsedOrderId).orElseThrow(() -> new OrderNotFoundException(parsedOrderId));
+            Order order = orderRepo.findByIdForUpdate(parsedOrderId)
+                    .orElseThrow(() -> new OrderNotFoundException(parsedOrderId));
 
             if (order.getStatus() == OrderStatus.PAID) {
+                log.info("Ignoring duplicate payment webhook for already paid orderId={}", order.getId());
                 return;
             }
 
