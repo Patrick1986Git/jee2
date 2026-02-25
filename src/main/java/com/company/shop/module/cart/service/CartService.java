@@ -68,6 +68,13 @@ public interface CartService {
     void clearCart();
 
     /**
+     * Purges all items from a specific user cart (system/internal use).
+     *
+     * @param userId unique identifier of cart owner.
+     */
+    void clearCartForUser(UUID userId);
+
+    /**
      * Retrieves the raw {@link Cart} entity associated with a specific user.
      * <p>
      * <strong>Note:</strong> This method is intended for internal use by other modules 

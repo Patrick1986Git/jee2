@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.shop.module.cart.service.CartService;
 import com.company.shop.module.order.dto.PaymentIntentResponseDTO;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderStatus;
@@ -49,9 +50,11 @@ public class PaymentServiceImpl implements PaymentService {
     private String publicKey;
 
     private final OrderRepository orderRepo;
+    private final CartService cartService;
 
-    public PaymentServiceImpl(OrderRepository orderRepo) {
+    public PaymentServiceImpl(OrderRepository orderRepo, CartService cartService) {
         this.orderRepo = orderRepo;
+        this.cartService = cartService;
     }
 
     @PostConstruct
@@ -117,6 +120,7 @@ public class PaymentServiceImpl implements PaymentService {
 
             order.markAsPaid();
             orderRepo.save(order);
+            cartService.clearCartForUser(order.getUser().getId());
         } catch (com.stripe.exception.SignatureVerificationException | IllegalArgumentException ex) {
             log.warn("Invalid Stripe webhook payload/signature", ex);
             throw new WebhookSignatureInvalidException();

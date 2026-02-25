@@ -127,13 +127,12 @@ public class OrderServiceImpl implements OrderService {
 
         Order savedOrder = orderRepo.save(order);
         paymentRepo.save(new Payment(savedOrder, "STRIPE", savedOrder.getTotalAmount()));
-        cartService.clearCart();
 
         return savedOrder;
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public OrderDetailedResponseDTO findById(UUID id) {
         Order order = orderRepo.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException(id));
@@ -148,13 +147,13 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<OrderResponseDTO> findAll(Pageable pageable) {
         return orderRepo.findAll(pageable).map(mapper::toDto);
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<OrderResponseDTO> findMyOrders(Pageable pageable) {
         User currentUser = userService.getCurrentUserEntity();
         return orderRepo.findByUser(currentUser, pageable).map(mapper::toDto);
