@@ -38,7 +38,7 @@ public interface OrderService {
      *
      * @param request DTO containing checkout parameters (e.g., discount codes).
      * @return a summary of the newly created order.
-     * @throws IllegalStateException if the cart is empty or stock is insufficient.
+     * @throws com.company.shop.common.exception.BusinessException when checkout constraints are violated.
      */
     OrderResponseDTO placeOrderFromCart(OrderCheckoutRequestDTO request);
 
@@ -47,7 +47,7 @@ public interface OrderService {
      *
      * @param id the unique identifier of the order.
      * @return a detailed DTO including line items and customer information.
-     * @throws jakarta.persistence.EntityNotFoundException if the order does not exist.
+     * @throws com.company.shop.module.order.exception.OrderNotFoundException if the order does not exist.
      */
     OrderDetailedResponseDTO findById(UUID id);
 

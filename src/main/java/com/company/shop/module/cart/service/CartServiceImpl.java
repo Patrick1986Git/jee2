@@ -126,8 +126,13 @@ public class CartServiceImpl implements CartService {
     public void clearCart() {
 
         User user = userService.getCurrentUserEntity();
+        clearCartForUser(user.getId());
+    }
 
-        cartRepository.findByUserId(user.getId())
+    @Override
+    public void clearCartForUser(UUID userId) {
+
+        cartRepository.findByUserId(userId)
                 .ifPresent(cart -> {
                     cart.clear();
                     cartRepository.save(cart);
