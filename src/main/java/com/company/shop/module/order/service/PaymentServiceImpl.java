@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.company.shop.module.cart.service.CartService;
 import com.company.shop.module.order.dto.PaymentIntentResponseDTO;
 import com.company.shop.module.order.entity.Payment;
+import com.company.shop.module.order.entity.PaymentStatus;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderStatus;
 import com.company.shop.module.order.exception.OrderNotFoundException;
@@ -85,6 +86,10 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             Payment payment = paymentRepo.findByOrderIdForUpdate(order.getId())
                     .orElseThrow(() -> new PaymentProcessingException("Payment record not found for order: " + order.getId()));
+
+            if (payment.getStatus() == PaymentStatus.COMPLETED) {
+                throw new PaymentProcessingException("Payment already completed for order: " + order.getId());
+            }
 
             if (payment.getProviderPaymentId() != null && !payment.getProviderPaymentId().isBlank()
                     && payment.getClientSecret() != null && !payment.getClientSecret().isBlank()) {
