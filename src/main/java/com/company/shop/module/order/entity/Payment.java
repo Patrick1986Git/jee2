@@ -74,5 +74,12 @@ public class Payment extends SoftDeleteEntity {
 	public void attachProviderPayment(String providerPaymentId, String clientSecret) {
 		this.providerPaymentId = providerPaymentId;
 		this.clientSecret = clientSecret;
+		if (this.status == null || this.status == PaymentStatus.FAILED) {
+			this.status = PaymentStatus.PENDING;
+		}
+	}
+
+	public void markAsCompleted() {
+		this.status = PaymentStatus.COMPLETED;
 	}
 }

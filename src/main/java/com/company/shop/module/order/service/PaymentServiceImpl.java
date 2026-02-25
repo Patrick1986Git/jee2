@@ -148,6 +148,12 @@ public class PaymentServiceImpl implements PaymentService {
 
             order.markAsPaid();
             orderRepo.save(order);
+
+            Payment payment = paymentRepo.findByOrderIdForUpdate(order.getId())
+                    .orElseThrow(() -> new PaymentProcessingException("Payment record not found for order: " + order.getId()));
+            payment.markAsCompleted();
+            paymentRepo.save(payment);
+
             cartService.clearCartForUser(order.getUser().getId());
         } catch (com.stripe.exception.SignatureVerificationException | IllegalArgumentException ex) {
             log.warn("Invalid Stripe webhook payload/signature", ex);
