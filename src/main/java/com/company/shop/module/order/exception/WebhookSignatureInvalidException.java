@@ -10,6 +10,10 @@ import com.company.shop.common.exception.BusinessException;
 public class WebhookSignatureInvalidException extends BusinessException {
 
     public WebhookSignatureInvalidException() {
-        super(HttpStatus.BAD_REQUEST, "Invalid Stripe webhook signature or payload.", "STRIPE_WEBHOOK_SIGNATURE_INVALID");
+        this("Invalid Stripe webhook signature or payload.");
+    }
+
+    public WebhookSignatureInvalidException(String message) {
+        super(HttpStatus.BAD_REQUEST, message, "STRIPE_WEBHOOK_SIGNATURE_INVALID");
     }
 }

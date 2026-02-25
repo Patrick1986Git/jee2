@@ -8,6 +8,8 @@
 
 package com.company.shop.module.order.service;
 
+import java.math.BigDecimal;
+import java.util.Locale;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.company.shop.module.order.dto.PaymentIntentResponseDTO;
 import com.company.shop.module.order.entity.Order;
+import com.company.shop.module.order.entity.OrderStatus;
 import com.company.shop.module.order.exception.OrderNotFoundException;
 import com.company.shop.module.order.exception.PaymentProcessingException;
 import com.company.shop.module.order.exception.StripeConfigurationException;
@@ -100,21 +103,53 @@ public class PaymentServiceImpl implements PaymentService {
 
             String orderId = intent.getMetadata().get("orderId");
             if (orderId == null || orderId.isBlank()) {
-                return;
+                throw new WebhookSignatureInvalidException("Missing orderId metadata in Stripe webhook.");
             }
 
             UUID parsedOrderId = UUID.fromString(orderId);
             Order order = orderRepo.findById(parsedOrderId).orElseThrow(() -> new OrderNotFoundException(parsedOrderId));
+
+            if (order.getStatus() == OrderStatus.PAID) {
+                return;
+            }
+
+            validatePaymentIntentMatchesOrder(intent, order);
+
             order.markAsPaid();
             orderRepo.save(order);
         } catch (com.stripe.exception.SignatureVerificationException | IllegalArgumentException ex) {
             log.warn("Invalid Stripe webhook payload/signature", ex);
             throw new WebhookSignatureInvalidException();
-        } catch (OrderNotFoundException ex) {
+        } catch (OrderNotFoundException | WebhookSignatureInvalidException ex) {
             throw ex;
         } catch (Exception e) {
             log.error("Stripe webhook processing failed", e);
             throw new WebhookProcessingException("Unable to process Stripe webhook event.");
+        }
+    }
+
+    private void validatePaymentIntentMatchesOrder(PaymentIntent intent, Order order) {
+        Long amount = intent.getAmountReceived() != null && intent.getAmountReceived() > 0
+                ? intent.getAmountReceived()
+                : intent.getAmount();
+
+        if (amount == null) {
+            throw new WebhookSignatureInvalidException("Stripe webhook does not contain payment amount.");
+        }
+
+        long expectedAmount = order.getTotalAmount().movePointRight(2).longValue();
+        if (amount.longValue() != expectedAmount) {
+            throw new WebhookSignatureInvalidException(
+                    "Stripe webhook payment amount does not match order total.");
+        }
+
+        String currency = intent.getCurrency();
+        if (currency == null || !"pln".equals(currency.toLowerCase(Locale.ROOT))) {
+            throw new WebhookSignatureInvalidException("Stripe webhook currency does not match expected currency.");
+        }
+
+        if (order.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new WebhookProcessingException("Order amount is invalid for payment reconciliation.");
         }
     }
 }
