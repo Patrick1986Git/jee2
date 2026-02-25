@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.company.shop.common.exception.BusinessException;
 import com.company.shop.module.cart.service.CartService;
 import com.company.shop.module.order.dto.PaymentIntentResponseDTO;
 import com.company.shop.module.order.entity.Payment;
@@ -113,7 +114,7 @@ public class PaymentServiceImpl implements PaymentService {
             paymentRepo.save(payment);
 
             return new PaymentIntentResponseDTO(intent.getClientSecret(), publicKey);
-        } catch (PaymentProcessingException ex) {
+        } catch (BusinessException ex) {
             throw ex;
         } catch (Exception e) {
             log.error("Stripe PaymentIntent creation failed for orderId={}", order.getId(), e);
