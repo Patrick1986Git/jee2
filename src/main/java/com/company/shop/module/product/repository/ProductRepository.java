@@ -76,6 +76,16 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
     boolean existsBySlug(String slug);
 
     /**
+     * Checks if another product exists with the given SKU (excluding current entity).
+     */
+    boolean existsBySkuAndIdNot(String sku, UUID id);
+
+    /**
+     * Checks if another product exists with the given slug (excluding current entity).
+     */
+    boolean existsBySlugAndIdNot(String slug, UUID id);
+
+    /**
      * Retrieves a paginated list of products belonging to a specific category.
      *
      * @param categoryId the identifier of the category.

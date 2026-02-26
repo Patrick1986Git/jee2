@@ -13,6 +13,7 @@ import com.company.shop.module.user.dto.UserUpdateDTO;
 import com.company.shop.module.user.entity.User;
 import com.company.shop.module.user.mapper.UserMapper;
 import com.company.shop.module.user.repository.UserRepository;
+import com.company.shop.security.SecurityConstants;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -80,5 +81,11 @@ public class UserServiceImpl implements UserService {
 		String email = SecurityContextHolder.getContext().getAuthentication().getName();
 		return repository.findByEmailWithRoles(email)
 				.orElseThrow(() -> new EntityNotFoundException("Nie znaleziono użytkownika: " + email));
+	}
+
+	@Override
+	public boolean isAdmin(User user) {
+		return user.getRoles().stream()
+				.anyMatch(role -> SecurityConstants.ROLE_ADMIN.equals(role.getName()));
 	}
 }

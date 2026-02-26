@@ -4,7 +4,6 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,86 +11,87 @@ import com.company.shop.module.product.dto.ProductReviewRequestDTO;
 import com.company.shop.module.product.dto.ProductReviewResponseDTO;
 import com.company.shop.module.product.entity.Product;
 import com.company.shop.module.product.entity.ProductReview;
+import com.company.shop.module.product.exception.ProductNotFoundException;
+import com.company.shop.module.product.exception.ProductReviewAccessDeniedException;
+import com.company.shop.module.product.exception.ProductReviewAlreadyExistsException;
+import com.company.shop.module.product.exception.ProductReviewNotFoundException;
 import com.company.shop.module.product.repository.ProductRepository;
 import com.company.shop.module.product.repository.ProductReviewRepository;
 import com.company.shop.module.user.entity.User;
 import com.company.shop.module.user.service.UserService;
 
-import jakarta.persistence.EntityNotFoundException;
-
 @Service
 @Transactional
 public class ProductReviewServiceImpl implements ProductReviewService {
 
-	private final ProductReviewRepository reviewRepo;
-	private final ProductRepository productRepo;
-	private final UserService userService;
+    private final ProductReviewRepository reviewRepo;
+    private final ProductRepository productRepo;
+    private final UserService userService;
 
-	public ProductReviewServiceImpl(ProductReviewRepository reviewRepo, ProductRepository productRepo, UserService userService) {
-		this.reviewRepo = reviewRepo;
-		this.productRepo = productRepo;
-		this.userService = userService;
-	}
+    public ProductReviewServiceImpl(ProductReviewRepository reviewRepo, ProductRepository productRepo, UserService userService) {
+        this.reviewRepo = reviewRepo;
+        this.productRepo = productRepo;
+        this.userService = userService;
+    }
 
-	@Override
-	public ProductReviewResponseDTO addReview(ProductReviewRequestDTO dto) {
-	    User user = userService.getCurrentUserEntity();
+    @Override
+    public ProductReviewResponseDTO addReview(ProductReviewRequestDTO dto) {
+        User user = userService.getCurrentUserEntity();
 
-	    if (reviewRepo.existsByProductIdAndUserId(dto.productId(), user.getId())) {
-	        throw new IllegalStateException("Już dodałeś opinię do tego produktu.");
-	    }
+        if (reviewRepo.existsByProductIdAndUserId(dto.productId(), user.getId())) {
+            throw new ProductReviewAlreadyExistsException(dto.productId());
+        }
 
-	    Product product = productRepo.findById(dto.productId())
-	            .orElseThrow(() -> new EntityNotFoundException("Produkt nie istnieje"));
+        Product product = getProductOrThrow(dto.productId());
+        ProductReview saved = reviewRepo.save(new ProductReview(product, user, dto.rating(), dto.comment()));
 
-	    // 1. Zapisz nową recenzję
-	    ProductReview review = new ProductReview(product, user, dto.rating(), dto.comment());
-	    ProductReview saved = reviewRepo.save(review);
+        updateProductRatingStats(product);
+        return mapToResponse(saved);
+    }
 
-	    // 2. Zaktualizuj statystyki produktu
-	    updateProductRatingStats(product);
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductReviewResponseDTO> getProductReviews(UUID productId, Pageable pageable) {
+        getProductOrThrow(productId);
+        return reviewRepo.findByProductId(productId, pageable).map(this::mapToResponse);
+    }
 
-	    return mapToResponse(saved);
-	}
+    @Override
+    public void deleteReview(UUID reviewId) {
+        ProductReview review = reviewRepo.findById(reviewId)
+                .orElseThrow(() -> new ProductReviewNotFoundException(reviewId));
 
-	@Override
-	@Transactional(readOnly = true)
-	public Page<ProductReviewResponseDTO> getProductReviews(UUID productId, Pageable pageable) {
-		return reviewRepo.findByProductId(productId, pageable).map(this::mapToResponse);
-	}
+        User currentUser = userService.getCurrentUserEntity();
+        boolean isOwner = review.getUser().getId().equals(currentUser.getId());
+        boolean isAdmin = userService.isAdmin(currentUser);
 
-	@Override
-	public void deleteReview(UUID reviewId) {
-	    ProductReview review = reviewRepo.findById(reviewId)
-	            .orElseThrow(() -> new EntityNotFoundException("Opinia nie istnieje"));
+        if (!isOwner && !isAdmin) {
+            throw new ProductReviewAccessDeniedException();
+        }
 
-	    // ... (Twoja logika uprawnień) ...
+        Product product = review.getProduct();
+        review.delete();
+        updateProductRatingStats(product);
+    }
 
-	    Product product = review.getProduct();
-	    reviewRepo.delete(review);
+    private Product getProductOrThrow(UUID productId) {
+        return productRepo.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
+    }
 
-	    // 2. Po usunięciu również aktualizujemy statystyki
-	    updateProductRatingStats(product);
-	}
+    private void updateProductRatingStats(Product product) {
+        Double avg = reviewRepo.getAverageRatingForProduct(product.getId());
+        long count = reviewRepo.countByProductIdAndDeletedFalse(product.getId());
 
-	/**
-	 * Enterprise Grade approach: Przeliczanie statystyk.
-	 * W skali miliona rekordów można to robić asynchronicznie, 
-	 * ale przy starcie projektu @Transactional w zupełności wystarczy.
-	 */
-	private void updateProductRatingStats(Product product) {
-	    // Pobieramy dane agregujące bezpośrednio z bazy dla spójności
-	    // Możesz dodać dedykowaną metodę do ProductReviewRepository
-	    Double avg = reviewRepo.getAverageRatingForProduct(product.getId());
-	    long count = reviewRepo.countByProductIdAndDeletedFalse(product.getId());
+        product.updateRatings(avg != null ? avg : 0.0, (int) count);
+        productRepo.save(product);
+    }
 
-	    product.updateRatings(avg != null ? avg : 0.0, (int) count);
-	    productRepo.save(product);
-	}
-
-	private ProductReviewResponseDTO mapToResponse(ProductReview review) {
-		return new ProductReviewResponseDTO(review.getId(),
-				review.getUser().getFirstName() + " " + review.getUser().getLastName(), review.getRating(),
-				review.getComment(), review.getCreatedAt());
-	}
+    private ProductReviewResponseDTO mapToResponse(ProductReview review) {
+        return new ProductReviewResponseDTO(review.getId(),
+                review.getUser().getFirstName() + " " + review.getUser().getLastName(),
+                review.getRating(),
+                review.getComment(),
+                review.getCreatedAt());
+    }
 }

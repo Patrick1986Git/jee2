@@ -13,6 +13,8 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,40 +26,34 @@ import com.company.shop.module.product.dto.ProductCreateDTO;
 import com.company.shop.module.product.dto.ProductResponseDTO;
 import com.company.shop.module.product.dto.ProductSearchCriteria;
 import com.company.shop.module.product.entity.Product;
+import com.company.shop.module.product.exception.ProductCategoryNotFoundException;
+import com.company.shop.module.product.exception.ProductNotFoundException;
+import com.company.shop.module.product.exception.ProductSkuAlreadyExistsException;
+import com.company.shop.module.product.exception.ProductSlugAlreadyExistsException;
 import com.company.shop.module.product.mapper.ProductMapper;
 import com.company.shop.module.product.repository.ProductRepository;
 import com.company.shop.module.product.specification.ProductSpecification;
 
-import jakarta.persistence.EntityNotFoundException;
-
-/**
- * Production implementation of {@link ProductService} providing high-level 
- * catalog management and search capabilities.
- * <p>
- * This service orchestrates complex business operations such as SEO-friendly slug 
- * generation, transactional media gallery updates, and advanced filtering 
- * through JPA Specifications.
- * </p>
- *
- * @since 1.0.0
- */
 @Service
 @Transactional
 public class ProductServiceImpl implements ProductService {
+
+    private static final Pattern WHITESPACE_OR_UNDERSCORE = Pattern.compile("[\\s_]+");
+    private static final Pattern NON_ALPHANUMERIC_HYPHEN = Pattern.compile("[^a-z0-9-]");
+    private static final Pattern MULTIPLE_HYPHENS = Pattern.compile("-{2,}");
+
+    private static final String SKU_UNIQUE_CONSTRAINT = "products_sku_key";
+    private static final String SLUG_UNIQUE_CONSTRAINT = "products_slug_key";
+    private static final String SLUG_FALLBACK_PREFIX = "product";
+    private static final int MAX_SLUG_SUFFIX = 10_000;
 
     private final ProductRepository productRepo;
     private final CategoryRepository categoryRepo;
     private final ProductMapper mapper;
 
-    private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
-    private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
-
-    /**
-     * Constructs the service with required core dependencies.
-     */
-    public ProductServiceImpl(ProductRepository productRepo, 
-                              CategoryRepository categoryRepo, 
-                              ProductMapper mapper) {
+    public ProductServiceImpl(ProductRepository productRepo,
+            CategoryRepository categoryRepo,
+            ProductMapper mapper) {
         this.productRepo = productRepo;
         this.categoryRepo = categoryRepo;
         this.mapper = mapper;
@@ -78,9 +74,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public ProductResponseDTO findById(UUID id) {
-        return productRepo.findById(id)
-                .map(mapper::toDto)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found with ID: " + id));
+        return mapper.toDto(getProductOrThrow(id));
     }
 
     @Override
@@ -88,84 +82,42 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponseDTO findBySlug(String slug) {
         return productRepo.findBySlug(slug)
                 .map(mapper::toDto)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found with slug: " + slug));
+                .orElseThrow(() -> new ProductNotFoundException(slug));
     }
 
-    /**
-     * Creates a new product and initializes its media gallery.
-     * <p>
-     * Ensures SKU uniqueness and handles potential slug collisions by 
-     * appending random suffixes.
-     * </p>
-     *
-     * @param dto the product creation data.
-     * @return the persisted product details.
-     * @throws IllegalArgumentException if SKU is already taken.
-     */
     @Override
     public ProductResponseDTO create(ProductCreateDTO dto) {
-        if (productRepo.existsBySku(dto.getSku())) {
-            throw new IllegalArgumentException("Product with SKU " + dto.getSku() + " already exists");
-        }
+        validateSkuUniquenessForCreate(dto.getSku());
 
-        Category category = categoryRepo.findById(dto.getCategoryId())
-                .orElseThrow(() -> new EntityNotFoundException("Category not found with ID: " + dto.getCategoryId()));
+        Category category = getCategoryOrThrow(dto.getCategoryId());
+        String slug = buildUniqueSlug(dto.getName(), null);
 
-        String slug = generateSlug(dto.getName());
-        if (productRepo.existsBySlug(slug)) {
-            slug = slug + "-" + UUID.randomUUID().toString().substring(0, 5);
-        }
-
-        Product product = new Product(
-                dto.getName(),
-                slug,
-                dto.getSku(),
-                dto.getDescription(),
-                dto.getPrice(),
-                dto.getStock(),
-                category
-        );
-        
-        // Populate media gallery via Aggregate Root
+        Product product = new Product(dto.getName(), slug, dto.getSku(), dto.getDescription(), dto.getPrice(), dto.getStock(),
+                category);
         product.replaceImages(dto.getImageUrls());
 
-        return mapper.toDto(productRepo.save(product));
+        return saveAndMap(product, dto.getSku(), slug, null);
     }
 
-    /**
-     * Updates an existing product and synchronizes its image gallery.
-     * <p>
-     * Orchestrates the removal of orphaned images and the addition of new media 
-     * within a single database transaction.
-     * </p>
-     *
-     * @param id  the identifier of the product to update.
-     * @param dto the new product state.
-     * @return the updated product details.
-     */
     @Override
     public ProductResponseDTO update(UUID id, ProductCreateDTO dto) {
-        Product product = productRepo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Update failed. Product not found."));
+        Product product = getProductOrThrow(id);
 
-        Category category = categoryRepo.findById(dto.getCategoryId())
-                .orElseThrow(() -> new EntityNotFoundException("Category not found"));
+        validateSkuUniquenessForUpdate(dto.getSku(), id);
+        Category category = getCategoryOrThrow(dto.getCategoryId());
+        String slug = buildUniqueSlug(dto.getName(), id);
 
-        String newSlug = generateSlug(dto.getName());
-        
-        product.update(dto.getName(), newSlug, dto.getDescription(), dto.getPrice(), dto.getStock(), category);
-        
-        // Synchronize gallery state
+        product.update(dto.getName(), slug, dto.getSku(), dto.getDescription(), dto.getPrice(), dto.getStock(), category);
         product.replaceImages(dto.getImageUrls());
 
-        return mapper.toDto(productRepo.save(product));
+        return saveAndMap(product, dto.getSku(), slug, id);
     }
 
     @Override
     public void delete(UUID id) {
-        Product product = productRepo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
+        Product product = getProductOrThrow(id);
         product.delete();
+        productRepo.save(product);
     }
 
     @Override
@@ -175,16 +127,99 @@ public class ProductServiceImpl implements ProductService {
                 .map(mapper::toDto);
     }
 
-    /**
-     * Transforms a raw string into an SEO-compliant URL slug.
-     *
-     * @param input the string to slugify.
-     * @return a normalized, lowercase, hyphenated string.
-     */
+    private Product getProductOrThrow(UUID id) {
+        return productRepo.findById(id)
+                .orElseThrow(() -> new ProductNotFoundException(id));
+    }
+
+    private Category getCategoryOrThrow(UUID categoryId) {
+        return categoryRepo.findById(categoryId)
+                .orElseThrow(() -> new ProductCategoryNotFoundException(categoryId));
+    }
+
+    private void validateSkuUniquenessForCreate(String sku) {
+        if (productRepo.existsBySku(sku)) {
+            throw new ProductSkuAlreadyExistsException(sku);
+        }
+    }
+
+    private void validateSkuUniquenessForUpdate(String sku, UUID productId) {
+        if (productRepo.existsBySkuAndIdNot(sku, productId)) {
+            throw new ProductSkuAlreadyExistsException(sku);
+        }
+    }
+
+    private String buildUniqueSlug(String name, UUID excludedProductId) {
+        String baseSlug = generateSlug(name);
+
+        if (!isSlugTaken(baseSlug, excludedProductId)) {
+            return baseSlug;
+        }
+
+        for (int suffix = 2; suffix <= MAX_SLUG_SUFFIX; suffix++) {
+            String candidate = baseSlug + "-" + suffix;
+            if (!isSlugTaken(candidate, excludedProductId)) {
+                return candidate;
+            }
+        }
+
+        throw new ProductSlugAlreadyExistsException(baseSlug);
+    }
+
+    private boolean isSlugTaken(String slug, UUID excludedProductId) {
+        if (excludedProductId == null) {
+            return productRepo.existsBySlug(slug);
+        }
+        return productRepo.existsBySlugAndIdNot(slug, excludedProductId);
+    }
+
+    private ProductResponseDTO saveAndMap(Product product, String sku, String slug, UUID excludedProductId) {
+        try {
+            return mapper.toDto(productRepo.saveAndFlush(product));
+        } catch (DataIntegrityViolationException ex) {
+            String constraintName = extractConstraintName(ex);
+            if (SKU_UNIQUE_CONSTRAINT.equals(constraintName)) {
+                throw new ProductSkuAlreadyExistsException(sku);
+            }
+            if (SLUG_UNIQUE_CONSTRAINT.equals(constraintName)) {
+                throw new ProductSlugAlreadyExistsException(slug);
+            }
+
+            if (excludedProductId == null && productRepo.existsBySku(sku)) {
+                throw new ProductSkuAlreadyExistsException(sku);
+            }
+            if (excludedProductId != null && productRepo.existsBySkuAndIdNot(sku, excludedProductId)) {
+                throw new ProductSkuAlreadyExistsException(sku);
+            }
+            if (isSlugTaken(slug, excludedProductId)) {
+                throw new ProductSlugAlreadyExistsException(slug);
+            }
+
+            throw ex;
+        }
+    }
+
+    private String extractConstraintName(Throwable throwable) {
+        Throwable cursor = throwable;
+        while (cursor != null) {
+            if (cursor instanceof ConstraintViolationException constraintViolationException) {
+                return constraintViolationException.getConstraintName();
+            }
+            cursor = cursor.getCause();
+        }
+        return null;
+    }
+
     private String generateSlug(String input) {
-        String nowhitespace = WHITESPACE.matcher(input).replaceAll("-");
-        String normalized = Normalizer.normalize(nowhitespace, Normalizer.Form.NFD);
-        String slug = NONLATIN.matcher(normalized).replaceAll("");
-        return slug.toLowerCase(Locale.ENGLISH);
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT);
+
+        String slug = WHITESPACE_OR_UNDERSCORE.matcher(normalized).replaceAll("-");
+        slug = NON_ALPHANUMERIC_HYPHEN.matcher(slug).replaceAll("");
+        slug = MULTIPLE_HYPHENS.matcher(slug).replaceAll("-");
+        slug = slug.replaceAll("(^-|-$)", "");
+
+        return slug.isBlank() ? SLUG_FALLBACK_PREFIX : slug;
     }
 }

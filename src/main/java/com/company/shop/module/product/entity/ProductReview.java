@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "product_reviews")
@@ -30,6 +31,10 @@ public class ProductReview extends SoftDeleteEntity {
 
 	@Column(columnDefinition = "TEXT")
 	private String comment;
+
+	@Version
+	@Column(name = "version", nullable = false)
+	private long version;
 
 	protected ProductReview() {
 	}
