@@ -52,7 +52,7 @@ public class ProductReview extends SoftDeleteEntity {
 		this.product = product;
 		this.user = user;
 		this.rating = rating;
-		this.comment = comment;
+		this.comment = sanitizeComment(comment);
 	}
 
 	public Product getProduct() {
@@ -75,7 +75,7 @@ public class ProductReview extends SoftDeleteEntity {
 		validateRating(rating);
 		validateComment(comment);
 		this.rating = rating;
-		this.comment = comment;
+		this.comment = sanitizeComment(comment);
 	}
 
 	private void validateRequiredAssociations(Product product, User user) {
@@ -97,5 +97,13 @@ public class ProductReview extends SoftDeleteEntity {
 		if (comment != null && comment.length() > MAX_COMMENT_LENGTH) {
 			throw new ProductDataInvalidException("Review comment must not exceed " + MAX_COMMENT_LENGTH + " characters");
 		}
+	}
+
+	private String sanitizeComment(String comment) {
+		if (comment == null) {
+			return null;
+		}
+		String normalized = comment.trim();
+		return normalized.isEmpty() ? null : normalized;
 	}
 }

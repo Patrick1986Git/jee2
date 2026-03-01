@@ -25,6 +25,18 @@ class ProductDomainValidationTest {
     }
 
     @Test
+    void updateRatings_shouldClampAverageIntoDomainRange() {
+        Category category = new Category("Name", "slug", "desc");
+        Product product = new Product("Prod", "prod", "SKU", "desc", BigDecimal.ONE, 10, category);
+
+        product.updateRatings(7.77, 5);
+        assertThat(product.getAverageRating()).isEqualTo(5.0);
+
+        product.updateRatings(-1.23, 5);
+        assertThat(product.getAverageRating()).isEqualTo(0.0);
+    }
+
+    @Test
     void constructor_shouldRejectBlankName() {
         Category category = new Category("Name", "slug", "desc");
 
@@ -60,4 +72,17 @@ class ProductDomainValidationTest {
                 .isInstanceOf(ProductDataInvalidException.class)
                 .hasMessageContaining("Review product is required");
     }
+    @Test
+    void review_shouldTrimCommentAndConvertBlankToNull() {
+        Category category = new Category("Name", "slug", "desc");
+        Product product = new Product("Prod", "prod", "SKU", "desc", BigDecimal.ONE, 10, category);
+        User user = org.mockito.Mockito.mock(User.class);
+
+        ProductReview review = new ProductReview(product, user, 5, "  hello world  ");
+        assertThat(review.getComment()).isEqualTo("hello world");
+
+        review.update(5, "   ");
+        assertThat(review.getComment()).isNull();
+    }
+
 }

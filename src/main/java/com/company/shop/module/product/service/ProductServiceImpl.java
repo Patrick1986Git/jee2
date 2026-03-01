@@ -229,6 +229,11 @@ public class ProductServiceImpl implements ProductService {
         slug = MULTIPLE_HYPHENS.matcher(slug).replaceAll("-");
         slug = slug.replaceAll("(^-|-$)", "");
 
-        return slug.isBlank() ? SLUG_FALLBACK_PREFIX : slug;
+        if (!slug.isBlank()) {
+            return slug;
+        }
+
+        String fallbackSuffix = UUID.randomUUID().toString().replace("-", "").substring(0, RANDOM_SUFFIX_LENGTH);
+        return SLUG_FALLBACK_PREFIX + "-" + fallbackSuffix;
     }
 }

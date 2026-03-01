@@ -37,6 +37,9 @@ import jakarta.persistence.Version;
 @SQLRestriction("deleted = false")
 public class Product extends SoftDeleteEntity {
 
+	private static final double MIN_AVERAGE_RATING = 0.0;
+	private static final double MAX_AVERAGE_RATING = 5.0;
+
 	@Column(nullable = false, length = 255)
 	private String name;
 
@@ -125,6 +128,7 @@ public class Product extends SoftDeleteEntity {
 		if (newCount == 0) {
 			safeAverage = 0.0;
 		}
+		safeAverage = Math.max(MIN_AVERAGE_RATING, Math.min(MAX_AVERAGE_RATING, safeAverage));
 
 		this.averageRating = BigDecimal.valueOf(safeAverage)
 				.setScale(2, RoundingMode.HALF_UP)
