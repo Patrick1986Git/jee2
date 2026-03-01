@@ -80,7 +80,7 @@ public class ProductReviewServiceImpl implements ProductReviewService {
     }
 
     private void updateProductRatingStats(Product product) {
-        Double avg = reviewRepo.getAverageRatingForProduct(product.getId());
+        Double avg = reviewRepo.getAverageRatingForProductAndDeletedFalse(product.getId());
         long count = reviewRepo.countByProductIdAndDeletedFalse(product.getId());
 
         product.updateRatings(avg != null ? avg : 0.0, (int) count);

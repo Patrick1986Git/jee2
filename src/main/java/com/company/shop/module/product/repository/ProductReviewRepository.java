@@ -20,7 +20,7 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, UU
 	Optional<ProductReview> findByProductIdAndUserId(UUID productId, UUID userId);
 
 	@Query("SELECT AVG(r.rating) FROM ProductReview r WHERE r.product.id = :productId AND r.deleted = false")
-	Double getAverageRatingForProduct(@Param("productId") UUID productId);
+	Double getAverageRatingForProductAndDeletedFalse(@Param("productId") UUID productId);
 
 	@Query("SELECT COUNT(r) FROM ProductReview r WHERE r.product.id = :productId AND r.deleted = false")
 	long countByProductIdAndDeletedFalse(@Param("productId") UUID productId);

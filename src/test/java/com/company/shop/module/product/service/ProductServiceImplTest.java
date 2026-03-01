@@ -111,8 +111,7 @@ class ProductServiceImplTest {
         verify(productRepository).saveAndFlush(productCaptor.capture());
 
         String slug = productCaptor.getValue().getSlug();
-        assertThat(slug).startsWith("product-");
-        assertThat(slug).hasSize("product-".length() + 8);
+        assertThat(slug).matches("^product-[a-f0-9]{8}$");
     }
 
     @Test
