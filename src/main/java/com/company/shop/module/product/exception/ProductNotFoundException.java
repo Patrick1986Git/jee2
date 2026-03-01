@@ -13,4 +13,10 @@ public class ProductNotFoundException extends BusinessException {
               "Product not found: " + productId,
               "PRODUCT_NOT_FOUND");
     }
+
+    public ProductNotFoundException(String slug) {
+        super(HttpStatus.NOT_FOUND,
+              "Product not found for slug: " + slug,
+              "PRODUCT_NOT_FOUND");
+    }
 }

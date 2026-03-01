@@ -50,7 +50,7 @@ public interface ProductService {
      *
      * @param id unique identifier of the product.
      * @return the product response object.
-     * @throws jakarta.persistence.EntityNotFoundException if no product is found.
+     * @throws com.company.shop.module.product.exception.ProductNotFoundException if no product is found.
      */
     ProductResponseDTO findById(UUID id);
 
@@ -59,7 +59,7 @@ public interface ProductService {
      *
      * @param slug the unique string identifier used in URLs.
      * @return the product response object.
-     * @throws jakarta.persistence.EntityNotFoundException if no product is found.
+     * @throws com.company.shop.module.product.exception.ProductNotFoundException if no product is found.
      */
     ProductResponseDTO findBySlug(String slug);
 
@@ -77,7 +77,7 @@ public interface ProductService {
      * @param id  unique identifier of the product to be updated.
      * @param dto the new product data.
      * @return the updated product response object.
-     * @throws jakarta.persistence.EntityNotFoundException if the product does not exist.
+     * @throws com.company.shop.module.product.exception.ProductNotFoundException if the product does not exist.
      */
     ProductResponseDTO update(UUID id, ProductCreateDTO dto);
 

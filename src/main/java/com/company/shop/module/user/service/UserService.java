@@ -22,4 +22,6 @@ public interface UserService {
 	void delete(UUID id);
 
 	User getCurrentUserEntity();
+
+	boolean isAdmin(User user);
 }

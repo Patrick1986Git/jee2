@@ -37,6 +37,17 @@ public class ProductCreateDTO {
 	public ProductCreateDTO() {
 	}
 
+	public ProductCreateDTO(String name, String sku, String description, BigDecimal price, int stock, UUID categoryId,
+			List<String> imageUrls) {
+		this.name = name;
+		this.sku = sku;
+		this.description = description;
+		this.price = price;
+		this.stock = stock;
+		this.categoryId = categoryId;
+		this.imageUrls = imageUrls;
+	}
+
 	public String getName() {
 		return name;
 	}

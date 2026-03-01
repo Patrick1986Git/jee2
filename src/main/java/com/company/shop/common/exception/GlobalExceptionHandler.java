@@ -4,19 +4,31 @@
 
 package com.company.shop.common.exception;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.validation.FieldError;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+
+import jakarta.validation.ConstraintViolationException;
 
 /**
  * Global interceptor for application-wide exception handling.
@@ -43,17 +55,16 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	public ResponseEntity<ApiError> handleValidationExceptions(MethodArgumentNotValidException ex) {
 
-		Map<String, String> errors = new HashMap<>();
+		Map<String, List<String>> errors = new HashMap<>();
 
-		ex.getBindingResult().getAllErrors().forEach(error -> {
-			String fieldName = ((FieldError) error).getField();
-			String errorMessage = error.getDefaultMessage();
-			errors.put(fieldName, errorMessage);
-		});
+		ex.getBindingResult().getFieldErrors().forEach(error -> addValidationError(errors, error.getField(), error.getDefaultMessage()));
+		ex.getBindingResult().getGlobalErrors()
+				.forEach(error -> addValidationError(errors, "_global", error.getDefaultMessage()));
 
-		log.warn("Input validation failed: {}", errors);
+		String traceId = Objects.toString(MDC.get("traceId"), "-");
+		log.warn("Input validation failed fields={} traceId={}", errors.keySet(), traceId);
 
-		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(), "Validation failed", errors);
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(), "Validation failed", "VALIDATION_FAILED", errors);
 
 		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
 	}
@@ -72,14 +83,100 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<ApiError> handleBusinessException(BusinessException ex) {
 
-		log.warn("Business exception occurred: {}", ex.getMessage());
+		String errorCode = ex.getErrorCode() != null ? ex.getErrorCode() : "UNKNOWN_BUSINESS_ERROR";
+		String traceId = Objects.toString(MDC.get("traceId"), "-");
+		if (ex.getStatus().is5xxServerError()) {
+			log.error("Business invariant/server exception occurred [{}] status={} type={} traceId={}",
+				errorCode,
+				ex.getStatus().value(),
+				ex.getClass().getSimpleName(),
+				traceId,
+				ex);
+		} else {
+			log.warn("Business exception occurred [{}] status={} type={} traceId={}",
+				errorCode,
+				ex.getStatus().value(),
+				ex.getClass().getSimpleName(),
+				traceId);
+		}
 
-		ApiError apiError = new ApiError(ex.getStatus().value(), ex.getMessage(), ex.getErrorCode() // może być null —
-																									// ApiError powinien
-																									// to obsłużyć
-		);
+		ApiError apiError = new ApiError(ex.getStatus().value(), ex.getMessage(), errorCode);
 
 		return new ResponseEntity<>(apiError, ex.getStatus());
+	}
+
+
+	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+	public ResponseEntity<ApiError> handleOptimisticLockingFailure(ObjectOptimisticLockingFailureException ex) {
+
+		String traceId = Objects.toString(MDC.get("traceId"), "-");
+		log.warn("Optimistic lock conflict status={} type={} traceId={}",
+				HttpStatus.CONFLICT.value(),
+				ex.getClass().getSimpleName(),
+				traceId);
+
+		ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(),
+				"Resource was modified by another transaction. Please refresh and retry.",
+				"OPTIMISTIC_LOCK_CONFLICT");
+
+		return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<ApiError> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+
+		String expectedType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+		Map<String, String> details = Map.of("parameter", ex.getName(), "expectedType", expectedType);
+
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
+				"Invalid request parameter: " + ex.getName(),
+				"REQUEST_INVALID",
+				details);
+
+		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+	}
+
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	public ResponseEntity<ApiError> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+
+		Throwable rootCause = findCause(ex, JsonParseException.class, InvalidFormatException.class);
+		String message = "Request body contains invalid values.";
+		if (rootCause instanceof JsonParseException) {
+			message = "Request body is malformed.";
+		}
+
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
+				message,
+				"REQUEST_INVALID");
+
+		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+	}
+
+	@ExceptionHandler(ConstraintViolationException.class)
+	public ResponseEntity<ApiError> handleConstraintViolationException(ConstraintViolationException ex) {
+
+		Map<String, String> errors = new HashMap<>();
+		ex.getConstraintViolations().forEach(v -> errors.put(v.getPropertyPath().toString(), v.getMessage()));
+
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
+				"Validation failed",
+				"VALIDATION_FAILED",
+				errors);
+
+		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+	}
+
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	public ResponseEntity<ApiError> handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
+
+		Map<String, String> details = Map.of("parameter", ex.getParameterName(), "expectedType", ex.getParameterType());
+
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
+				"Missing required request parameter: " + ex.getParameterName(),
+				"REQUEST_INVALID",
+				details);
+
+		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
 	}
 
 	/**
@@ -92,7 +189,8 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
 
 		ApiError apiError = new ApiError(HttpStatus.FORBIDDEN.value(),
-				"Insufficient permissions to access this resource");
+				"Insufficient permissions to access this resource",
+				"ACCESS_DENIED");
 
 		return new ResponseEntity<>(apiError, HttpStatus.FORBIDDEN);
 	}
@@ -107,9 +205,27 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiError> handleNoHandlerFound(NoHandlerFoundException ex) {
 
 		ApiError apiError = new ApiError(HttpStatus.NOT_FOUND.value(),
-				"No endpoint found for: " + ex.getHttpMethod() + " " + ex.getRequestURL());
+				"No endpoint found for: " + ex.getHttpMethod() + " " + ex.getRequestURL(),
+				"ENDPOINT_NOT_FOUND");
 
 		return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+	}
+
+	private Throwable findCause(Throwable throwable, Class<?>... types) {
+		Throwable current = throwable;
+		while (current != null) {
+			for (Class<?> type : types) {
+				if (type.isInstance(current)) {
+					return current;
+				}
+			}
+			current = current.getCause();
+		}
+		return null;
+	}
+
+	private void addValidationError(Map<String, List<String>> errors, String key, String message) {
+		errors.computeIfAbsent(key, k -> new ArrayList<>()).add(message);
 	}
 
 	/**

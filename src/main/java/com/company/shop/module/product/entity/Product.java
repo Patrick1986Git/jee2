@@ -9,14 +9,18 @@
 package com.company.shop.module.product.entity;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.hibernate.annotations.SQLRestriction;
 
 import com.company.shop.common.model.SoftDeleteEntity;
 import com.company.shop.module.category.entity.Category;
+import com.company.shop.module.product.exception.ProductDataInvalidException;
+import com.company.shop.module.product.exception.ProductInsufficientStockException;
+import com.company.shop.module.product.exception.ProductReviewCountInvalidException;
+import com.company.shop.module.product.exception.ProductStockInvalidException;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -26,21 +30,15 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
-/**
- * Core entity representing a commercial product within the catalog.
- * <p>
- * This entity serves as an Aggregate Root for product-related data, including
- * inventory levels, pricing, and media assets. It maintains strict invariants
- * regarding stock management and financial calculations.
- * </p>
- *
- * @since 1.0.0
- */
 @Entity
 @Table(name = "products")
 @SQLRestriction("deleted = false")
 public class Product extends SoftDeleteEntity {
+
+	private static final double MIN_AVERAGE_RATING = 0.0;
+	private static final double MAX_AVERAGE_RATING = 5.0;
 
 	@Column(nullable = false, length = 255)
 	private String name;
@@ -60,6 +58,10 @@ public class Product extends SoftDeleteEntity {
 	@Column(nullable = false)
 	private int stock;
 
+	@Version
+	@Column(name = "version", nullable = false)
+	private long version;
+
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "category_id")
 	private Category category;
@@ -70,10 +72,6 @@ public class Product extends SoftDeleteEntity {
 	@Column(name = "review_count", nullable = false)
 	private int reviewCount = 0;
 
-	/**
-	 * Managed gallery of product images. Uses CascadeType.ALL and orphanRemoval to
-	 * ensure that image lifecycle is strictly bound to the product.
-	 */
 	@OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<ProductImage> images = new ArrayList<>();
 
@@ -82,6 +80,15 @@ public class Product extends SoftDeleteEntity {
 
 	public Product(String name, String slug, String sku, String description, BigDecimal price, int stock,
 			Category category) {
+		validateRequiredText(name, "Product name cannot be blank");
+		validateRequiredText(slug, "Product slug cannot be blank");
+		validateRequiredText(sku, "Product SKU cannot be blank");
+		validatePrice(price);
+		validateStock(stock);
+		if (category == null) {
+			throw new ProductDataInvalidException("Product category is required");
+		}
+
 		this.name = name;
 		this.slug = slug;
 		this.sku = sku;
@@ -93,15 +100,6 @@ public class Product extends SoftDeleteEntity {
 		this.reviewCount = 0;
 	}
 
-	/**
-	 * Replaces the entire image gallery with a new set of URLs.
-	 * <p>
-	 * Due to {@code orphanRemoval}, existing images not present in the new list
-	 * will be deleted from the database.
-	 * </p>
-	 *
-	 * @param newImageUrls list of new image resource locations.
-	 */
 	public void replaceImages(List<String> newImageUrls) {
 		this.images.clear();
 		if (newImageUrls != null) {
@@ -109,21 +107,11 @@ public class Product extends SoftDeleteEntity {
 		}
 	}
 
-	/**
-	 * Adds a single image to the product gallery.
-	 *
-	 * @param url the location of the image resource.
-	 */
 	public void addImage(String url) {
 		ProductImage image = new ProductImage(url, this);
 		this.images.add(image);
 	}
 
-	/**
-	 * Resolves the primary image for the product.
-	 *
-	 * @return the URL of the first image in the gallery, or {@code null} if empty.
-	 */
 	public String getMainImageUrl() {
 		if (images != null && !images.isEmpty()) {
 			return images.get(0).getImageUrl();
@@ -133,15 +121,35 @@ public class Product extends SoftDeleteEntity {
 
 	public void updateRatings(Double newAverage, int newCount) {
 		if (newCount < 0) {
-			throw new IllegalArgumentException("Review count cannot be negative");
+			throw new ProductReviewCountInvalidException(newCount);
 		}
-		this.averageRating = newAverage;
+
+		double safeAverage = newAverage != null ? newAverage : 0.0;
+		if (newCount == 0) {
+			safeAverage = 0.0;
+		}
+		safeAverage = Math.max(MIN_AVERAGE_RATING, Math.min(MAX_AVERAGE_RATING, safeAverage));
+
+		this.averageRating = BigDecimal.valueOf(safeAverage)
+				.setScale(2, RoundingMode.HALF_UP)
+				.doubleValue();
 		this.reviewCount = newCount;
 	}
 
-	public void update(String name, String slug, String description, BigDecimal price, int stock, Category category) {
+	public void update(String name, String slug, String sku, String description, BigDecimal price, int stock,
+			Category category) {
+		validateRequiredText(name, "Product name cannot be blank");
+		validateRequiredText(slug, "Product slug cannot be blank");
+		validateRequiredText(sku, "Product SKU cannot be blank");
+		validatePrice(price);
+		validateStock(stock);
+		if (category == null) {
+			throw new ProductDataInvalidException("Product category is required");
+		}
+
 		this.name = name;
 		this.slug = slug;
+		this.sku = sku;
 		this.description = description;
 		this.price = price;
 		this.stock = stock;
@@ -149,28 +157,36 @@ public class Product extends SoftDeleteEntity {
 	}
 
 	public void updateStock(int newStock) {
-		if (newStock < 0) {
-			throw new IllegalArgumentException("Stock level cannot be negative");
-		}
+		validateStock(newStock);
 		this.stock = newStock;
 	}
 
-	/**
-	 * Safely decreases stock level.
-	 *
-	 * @param quantityToDecrease number of units to remove.
-	 * @throws IllegalStateException if the requested quantity exceeds available
-	 *                               stock.
-	 */
 	public void decreaseStock(int quantityToDecrease) {
 		if (quantityToDecrease <= 0) {
-			throw new IllegalArgumentException("Quantity to decrease must be positive");
+			throw new ProductStockInvalidException("decrease", quantityToDecrease);
 		}
 		if (this.stock < quantityToDecrease) {
-			throw new IllegalStateException(
-					"Insufficient stock for product: " + this.name + ". Available: " + this.stock);
+			throw new ProductInsufficientStockException(this.name, quantityToDecrease, this.stock);
 		}
 		this.stock -= quantityToDecrease;
+	}
+
+	private void validateRequiredText(String value, String message) {
+		if (value == null || value.isBlank()) {
+			throw new ProductDataInvalidException(message);
+		}
+	}
+
+	private void validatePrice(BigDecimal value) {
+		if (value == null || value.signum() <= 0) {
+			throw new ProductDataInvalidException("Product price must be greater than zero");
+		}
+	}
+
+	private void validateStock(int value) {
+		if (value < 0) {
+			throw new ProductStockInvalidException(value);
+		}
 	}
 
 	public String getName() {
@@ -209,12 +225,7 @@ public class Product extends SoftDeleteEntity {
 		return reviewCount;
 	}
 
-	/**
-	 * Returns an unmodifiable view of the product images.
-	 *
-	 * @return a read-only list of {@link ProductImage} entities.
-	 */
 	public List<ProductImage> getImages() {
-		return Collections.unmodifiableList(images);
+		return images == null ? List.of() : List.copyOf(images);
 	}
 }
