@@ -94,6 +94,28 @@ class ProductServiceImplTest {
     }
 
     @Test
+    void create_shouldUseRandomizedFallbackWhenSlugBecomesBlank() {
+        UUID categoryId = UUID.randomUUID();
+        ProductCreateDTO dto = dto("___", "SKU-XYZ", categoryId);
+        Category category = new Category("Accessories", "accessories", "desc");
+
+        when(productRepository.existsBySku(dto.getSku())).thenReturn(false);
+        when(categoryRepository.findById(dto.getCategoryId())).thenReturn(Optional.of(category));
+        when(productRepository.existsBySlug(any(String.class))).thenReturn(false);
+        when(productRepository.saveAndFlush(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productMapper.toDto(any(Product.class))).thenReturn(stubResponse());
+
+        service.create(dto);
+
+        ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).saveAndFlush(productCaptor.capture());
+
+        String slug = productCaptor.getValue().getSlug();
+        assertThat(slug).startsWith("product-");
+        assertThat(slug).hasSize("product-".length() + 8);
+    }
+
+    @Test
     void update_shouldUpdateSkuInAggregate() {
         UUID productId = UUID.randomUUID();
         UUID categoryId = UUID.randomUUID();

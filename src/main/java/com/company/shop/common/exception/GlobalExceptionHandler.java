@@ -73,8 +73,12 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<ApiError> handleBusinessException(BusinessException ex) {
 
-		log.warn("Business exception occurred: {}", ex.getMessage());
 		String errorCode = ex.getErrorCode() != null ? ex.getErrorCode() : "UNKNOWN_BUSINESS_ERROR";
+		if (ex.getStatus().is5xxServerError()) {
+			log.error("Business invariant/server exception occurred: {} [{}]", ex.getMessage(), errorCode, ex);
+		} else {
+			log.warn("Business exception occurred: {} [{}]", ex.getMessage(), errorCode);
+		}
 
 		ApiError apiError = new ApiError(ex.getStatus().value(), ex.getMessage(), errorCode);
 

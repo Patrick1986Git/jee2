@@ -48,11 +48,12 @@ public class ProductReview extends SoftDeleteEntity {
 	public ProductReview(Product product, User user, int rating, String comment) {
 		validateRequiredAssociations(product, user);
 		validateRating(rating);
-		validateComment(comment);
+		String sanitizedComment = sanitizeComment(comment);
+		validateComment(sanitizedComment);
 		this.product = product;
 		this.user = user;
 		this.rating = rating;
-		this.comment = sanitizeComment(comment);
+		this.comment = sanitizedComment;
 	}
 
 	public Product getProduct() {
@@ -72,10 +73,12 @@ public class ProductReview extends SoftDeleteEntity {
 	}
 
 	public void update(int rating, String comment) {
+		validateRequiredAssociations(this.product, this.user);
 		validateRating(rating);
-		validateComment(comment);
+		String sanitizedComment = sanitizeComment(comment);
+		validateComment(sanitizedComment);
 		this.rating = rating;
-		this.comment = sanitizeComment(comment);
+		this.comment = sanitizedComment;
 	}
 
 	private void validateRequiredAssociations(Product product, User user) {
