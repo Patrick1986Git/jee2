@@ -23,6 +23,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+
+import jakarta.validation.ConstraintViolationException;
+
 /**
  * Global interceptor for application-wide exception handling.
  *
@@ -120,9 +125,13 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	public ResponseEntity<ApiError> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
 
+		String expectedType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+		Map<String, String> details = Map.of("parameter", ex.getName(), "expectedType", expectedType);
+
 		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
-				"Invalid request parameter type: " + ex.getName(),
-				"REQUEST_INVALID");
+				"Invalid request parameter: " + ex.getName(),
+				"REQUEST_INVALID",
+				details);
 
 		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
 	}
@@ -130,9 +139,31 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	public ResponseEntity<ApiError> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
 
+		Throwable cause = ex.getCause();
+		String message = "Request body contains invalid values.";
+		if (cause instanceof JsonParseException) {
+			message = "Request body is malformed.";
+		} else if (cause instanceof InvalidFormatException) {
+			message = "Request body contains invalid values.";
+		}
+
 		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
-				"Request body is malformed or contains invalid values.",
+				message,
 				"REQUEST_INVALID");
+
+		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+	}
+
+	@ExceptionHandler(ConstraintViolationException.class)
+	public ResponseEntity<ApiError> handleConstraintViolationException(ConstraintViolationException ex) {
+
+		Map<String, String> errors = new HashMap<>();
+		ex.getConstraintViolations().forEach(v -> errors.put(v.getPropertyPath().toString(), v.getMessage()));
+
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
+				"Validation failed",
+				"VALIDATION_FAILED",
+				errors);
 
 		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
 	}

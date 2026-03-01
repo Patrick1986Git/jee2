@@ -47,7 +47,7 @@ public class ProductReview extends SoftDeleteEntity {
 	}
 
 	public ProductReview(Product product, User user, int rating, String comment) {
-		validateRequiredAssociations(product, user);
+		validateRequiredAssociationsForConstruction(product, user);
 		validateRating(rating);
 		String sanitizedComment = sanitizeComment(comment);
 		validateComment(sanitizedComment);
@@ -74,7 +74,7 @@ public class ProductReview extends SoftDeleteEntity {
 	}
 
 	public void update(int rating, String comment) {
-		validateRequiredAssociations(this.product, this.user);
+		validateInvariantState();
 		validateRating(rating);
 		String sanitizedComment = sanitizeComment(comment);
 		validateComment(sanitizedComment);
@@ -82,11 +82,20 @@ public class ProductReview extends SoftDeleteEntity {
 		this.comment = sanitizedComment;
 	}
 
-	private void validateRequiredAssociations(Product product, User user) {
+	private void validateRequiredAssociationsForConstruction(Product product, User user) {
 		if (product == null) {
-			throw new ProductInvariantViolationException("Review entity is in invalid state: product association is missing");
+			throw new ProductDataInvalidException("Review product is required");
 		}
 		if (user == null) {
+			throw new ProductDataInvalidException("Review user is required");
+		}
+	}
+
+	private void validateInvariantState() {
+		if (this.product == null) {
+			throw new ProductInvariantViolationException("Review entity is in invalid state: product association is missing");
+		}
+		if (this.user == null) {
 			throw new ProductInvariantViolationException("Review entity is in invalid state: user association is missing");
 		}
 	}

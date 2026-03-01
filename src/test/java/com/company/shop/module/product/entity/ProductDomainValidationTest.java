@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import com.company.shop.module.category.entity.Category;
 import com.company.shop.module.product.exception.ProductDataInvalidException;
-import com.company.shop.module.product.exception.ProductInvariantViolationException;
 import com.company.shop.module.product.exception.ProductReviewRatingInvalidException;
 import com.company.shop.module.user.entity.User;
 
@@ -70,8 +69,8 @@ class ProductDomainValidationTest {
         Product product = new Product("Prod", "prod", "SKU", "desc", BigDecimal.ONE, 10, category);
 
         assertThatThrownBy(() -> new ProductReview(product, null, 5, "ok"))
-                .isInstanceOf(ProductInvariantViolationException.class)
-                .hasMessageContaining("user association is missing");
+                .isInstanceOf(ProductDataInvalidException.class)
+                .hasMessageContaining("Review user is required");
     }
 
     @Test
@@ -79,8 +78,8 @@ class ProductDomainValidationTest {
         User user = org.mockito.Mockito.mock(User.class);
 
         assertThatThrownBy(() -> new ProductReview(null, user, 5, "ok"))
-                .isInstanceOf(ProductInvariantViolationException.class)
-                .hasMessageContaining("product association is missing");
+                .isInstanceOf(ProductDataInvalidException.class)
+                .hasMessageContaining("Review product is required");
     }
     @Test
     void review_shouldTrimCommentAndConvertBlankToNull() {
