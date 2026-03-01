@@ -4,7 +4,9 @@
 
 package com.company.shop.common.exception;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -18,6 +20,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -53,18 +56,18 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(MethodArgumentNotValidException.class)
 	public ResponseEntity<ApiError> handleValidationExceptions(MethodArgumentNotValidException ex) {
 
-		Map<String, String> errors = new HashMap<>();
+		Map<String, List<String>> errors = new HashMap<>();
 
 		ex.getBindingResult().getAllErrors().forEach(error -> {
 			String fieldName = ((FieldError) error).getField();
 			String errorMessage = error.getDefaultMessage();
-			errors.put(fieldName, errorMessage);
+			errors.computeIfAbsent(fieldName, k -> new ArrayList<>()).add(errorMessage);
 		});
 
 		String traceId = Objects.toString(MDC.get("traceId"), "-");
 		log.warn("Input validation failed fields={} traceId={}", errors.keySet(), traceId);
 
-		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(), "Validation failed", errors);
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(), "Validation failed", "VALIDATION_FAILED", errors);
 
 		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
 	}
@@ -139,12 +142,10 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	public ResponseEntity<ApiError> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
 
-		Throwable cause = ex.getCause();
+		Throwable rootCause = findCause(ex, JsonParseException.class, InvalidFormatException.class);
 		String message = "Request body contains invalid values.";
-		if (cause instanceof JsonParseException) {
+		if (rootCause instanceof JsonParseException) {
 			message = "Request body is malformed.";
-		} else if (cause instanceof InvalidFormatException) {
-			message = "Request body contains invalid values.";
 		}
 
 		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
@@ -164,6 +165,19 @@ public class GlobalExceptionHandler {
 				"Validation failed",
 				"VALIDATION_FAILED",
 				errors);
+
+		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+	}
+
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	public ResponseEntity<ApiError> handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
+
+		Map<String, String> details = Map.of("parameter", ex.getParameterName(), "expectedType", ex.getParameterType());
+
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
+				"Missing required request parameter: " + ex.getParameterName(),
+				"REQUEST_INVALID",
+				details);
 
 		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
 	}
@@ -198,6 +212,19 @@ public class GlobalExceptionHandler {
 				"ENDPOINT_NOT_FOUND");
 
 		return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+	}
+
+	private Throwable findCause(Throwable throwable, Class<?>... types) {
+		Throwable current = throwable;
+		while (current != null) {
+			for (Class<?> type : types) {
+				if (type.isInstance(current)) {
+					return current;
+				}
+			}
+			current = current.getCause();
+		}
+		return null;
 	}
 
 	/**
