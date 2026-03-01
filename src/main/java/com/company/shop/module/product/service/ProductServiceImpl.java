@@ -42,10 +42,12 @@ public class ProductServiceImpl implements ProductService {
     private static final Pattern NON_ALPHANUMERIC_HYPHEN = Pattern.compile("[^a-z0-9-]");
     private static final Pattern MULTIPLE_HYPHENS = Pattern.compile("-{2,}");
 
-    private static final String SKU_UNIQUE_CONSTRAINT = "products_sku_key";
-    private static final String SLUG_UNIQUE_CONSTRAINT = "products_slug_key";
+    private static final String SKU_UNIQUE_CONSTRAINT = "uq_products_sku";
+    private static final String SLUG_UNIQUE_CONSTRAINT = "uq_products_slug";
     private static final String SLUG_FALLBACK_PREFIX = "product";
-    private static final int MAX_SLUG_SUFFIX = 10_000;
+    private static final int DETERMINISTIC_SUFFIX_PROBES = 5;
+    private static final int RANDOM_SUFFIX_ATTEMPTS = 20;
+    private static final int RANDOM_SUFFIX_LENGTH = 8;
 
     private final ProductRepository productRepo;
     private final CategoryRepository categoryRepo;
@@ -117,7 +119,6 @@ public class ProductServiceImpl implements ProductService {
     public void delete(UUID id) {
         Product product = getProductOrThrow(id);
         product.delete();
-        productRepo.save(product);
     }
 
     @Override
@@ -156,8 +157,16 @@ public class ProductServiceImpl implements ProductService {
             return baseSlug;
         }
 
-        for (int suffix = 2; suffix <= MAX_SLUG_SUFFIX; suffix++) {
+        for (int suffix = 2; suffix <= DETERMINISTIC_SUFFIX_PROBES + 1; suffix++) {
             String candidate = baseSlug + "-" + suffix;
+            if (!isSlugTaken(candidate, excludedProductId)) {
+                return candidate;
+            }
+        }
+
+        for (int attempt = 0; attempt < RANDOM_SUFFIX_ATTEMPTS; attempt++) {
+            String randomSuffix = UUID.randomUUID().toString().replace("-", "").substring(0, RANDOM_SUFFIX_LENGTH);
+            String candidate = baseSlug + "-" + randomSuffix;
             if (!isSlugTaken(candidate, excludedProductId)) {
                 return candidate;
             }

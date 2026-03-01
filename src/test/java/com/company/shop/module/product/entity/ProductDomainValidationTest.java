@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import com.company.shop.module.category.entity.Category;
 import com.company.shop.module.product.exception.ProductDataInvalidException;
 import com.company.shop.module.product.exception.ProductReviewRatingInvalidException;
+import com.company.shop.module.user.entity.User;
 
 class ProductDomainValidationTest {
 
@@ -35,8 +36,28 @@ class ProductDomainValidationTest {
     void review_shouldRejectInvalidRating() {
         Category category = new Category("Name", "slug", "desc");
         Product product = new Product("Prod", "prod", "SKU", "desc", BigDecimal.ONE, 10, category);
+        User user = org.mockito.Mockito.mock(User.class);
 
-        assertThatThrownBy(() -> new ProductReview(product, null, 6, "bad"))
+        assertThatThrownBy(() -> new ProductReview(product, user, 6, "bad"))
                 .isInstanceOf(ProductReviewRatingInvalidException.class);
+    }
+
+    @Test
+    void review_shouldRejectNullUser() {
+        Category category = new Category("Name", "slug", "desc");
+        Product product = new Product("Prod", "prod", "SKU", "desc", BigDecimal.ONE, 10, category);
+
+        assertThatThrownBy(() -> new ProductReview(product, null, 5, "ok"))
+                .isInstanceOf(ProductDataInvalidException.class)
+                .hasMessageContaining("Review user is required");
+    }
+
+    @Test
+    void review_shouldRejectNullProduct() {
+        User user = org.mockito.Mockito.mock(User.class);
+
+        assertThatThrownBy(() -> new ProductReview(null, user, 5, "ok"))
+                .isInstanceOf(ProductDataInvalidException.class)
+                .hasMessageContaining("Review product is required");
     }
 }

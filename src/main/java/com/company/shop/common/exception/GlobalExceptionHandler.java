@@ -74,11 +74,9 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiError> handleBusinessException(BusinessException ex) {
 
 		log.warn("Business exception occurred: {}", ex.getMessage());
+		String errorCode = ex.getErrorCode() != null ? ex.getErrorCode() : "UNKNOWN_BUSINESS_ERROR";
 
-		ApiError apiError = new ApiError(ex.getStatus().value(), ex.getMessage(), ex.getErrorCode() // może być null —
-																									// ApiError powinien
-																									// to obsłużyć
-		);
+		ApiError apiError = new ApiError(ex.getStatus().value(), ex.getMessage(), errorCode);
 
 		return new ResponseEntity<>(apiError, ex.getStatus());
 	}
@@ -106,7 +104,8 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
 
 		ApiError apiError = new ApiError(HttpStatus.FORBIDDEN.value(),
-				"Insufficient permissions to access this resource");
+				"Insufficient permissions to access this resource",
+				"ACCESS_DENIED");
 
 		return new ResponseEntity<>(apiError, HttpStatus.FORBIDDEN);
 	}
@@ -121,7 +120,8 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiError> handleNoHandlerFound(NoHandlerFoundException ex) {
 
 		ApiError apiError = new ApiError(HttpStatus.NOT_FOUND.value(),
-				"No endpoint found for: " + ex.getHttpMethod() + " " + ex.getRequestURL());
+				"No endpoint found for: " + ex.getHttpMethod() + " " + ex.getRequestURL(),
+				"ENDPOINT_NOT_FOUND");
 
 		return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
 	}
