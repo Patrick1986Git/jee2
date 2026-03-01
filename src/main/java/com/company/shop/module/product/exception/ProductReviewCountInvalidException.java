@@ -11,4 +11,10 @@ public class ProductReviewCountInvalidException extends BusinessException {
                 "Product review count cannot be negative: " + reviewCount,
                 "PRODUCT_REVIEW_INVARIANT_VIOLATION");
     }
+
+    public ProductReviewCountInvalidException(String message) {
+        super(HttpStatus.INTERNAL_SERVER_ERROR,
+                message,
+                "PRODUCT_REVIEW_INVARIANT_VIOLATION");
+    }
 }

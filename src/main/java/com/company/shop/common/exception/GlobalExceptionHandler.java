@@ -9,6 +9,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -74,17 +75,20 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiError> handleBusinessException(BusinessException ex) {
 
 		String errorCode = ex.getErrorCode() != null ? ex.getErrorCode() : "UNKNOWN_BUSINESS_ERROR";
+		String traceId = MDC.get("traceId");
 		if (ex.getStatus().is5xxServerError()) {
-			log.error("Business invariant/server exception occurred [{}] status={} type={}",
+			log.error("Business invariant/server exception occurred [{}] status={} type={} traceId={}",
 				errorCode,
 				ex.getStatus().value(),
 				ex.getClass().getSimpleName(),
+				traceId,
 				ex);
 		} else {
-			log.warn("Business exception occurred [{}] status={} type={}",
+			log.warn("Business exception occurred [{}] status={} type={} traceId={}",
 				errorCode,
 				ex.getStatus().value(),
-				ex.getClass().getSimpleName());
+				ex.getClass().getSimpleName(),
+				traceId);
 		}
 
 		ApiError apiError = new ApiError(ex.getStatus().value(), ex.getMessage(), errorCode);

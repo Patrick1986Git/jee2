@@ -15,8 +15,10 @@ import com.company.shop.module.product.exception.ProductNotFoundException;
 import com.company.shop.module.product.exception.ProductReviewAccessDeniedException;
 import com.company.shop.module.product.exception.ProductReviewAlreadyExistsException;
 import com.company.shop.module.product.exception.ProductReviewNotFoundException;
+import com.company.shop.module.product.exception.ProductReviewCountInvalidException;
 import com.company.shop.module.product.repository.ProductRepository;
 import com.company.shop.module.product.repository.ProductReviewRepository;
+import com.company.shop.module.product.repository.RatingStats;
 import com.company.shop.module.user.entity.User;
 import com.company.shop.module.user.service.UserService;
 
@@ -80,10 +82,15 @@ public class ProductReviewServiceImpl implements ProductReviewService {
     }
 
     private void updateProductRatingStats(Product product) {
-        Double avg = reviewRepo.getAverageRatingForProductAndDeletedFalse(product.getId());
-        long count = reviewRepo.countByProductIdAndDeletedFalse(product.getId());
+        RatingStats stats = reviewRepo.getRatingStatsByProductId(product.getId());
+        long count = stats.reviewCount();
 
-        product.updateRatings(avg != null ? avg : 0.0, (int) count);
+        if (count > Integer.MAX_VALUE) {
+            throw new ProductReviewCountInvalidException("Review count exceeds integer range for product: " + product.getId());
+        }
+
+        double avg = stats.averageRating() != null ? stats.averageRating() : 0.0;
+        product.updateRatings(avg, (int) count);
         productRepo.save(product);
     }
 
