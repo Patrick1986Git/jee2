@@ -3,6 +3,7 @@ package com.company.shop.module.product.entity;
 import org.hibernate.annotations.SQLRestriction;
 
 import com.company.shop.common.model.SoftDeleteEntity;
+import com.company.shop.module.product.exception.ProductReviewRatingInvalidException;
 import com.company.shop.module.user.entity.User;
 
 import jakarta.persistence.Column;
@@ -17,6 +18,9 @@ import jakarta.persistence.Version;
 @Table(name = "product_reviews")
 @SQLRestriction("deleted = false")
 public class ProductReview extends SoftDeleteEntity {
+
+	private static final int MIN_RATING = 1;
+	private static final int MAX_RATING = 5;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "product_id")
@@ -40,6 +44,7 @@ public class ProductReview extends SoftDeleteEntity {
 	}
 
 	public ProductReview(Product product, User user, int rating, String comment) {
+		validateRating(rating);
 		this.product = product;
 		this.user = user;
 		this.rating = rating;
@@ -63,7 +68,14 @@ public class ProductReview extends SoftDeleteEntity {
 	}
 
 	public void update(int rating, String comment) {
+		validateRating(rating);
 		this.rating = rating;
 		this.comment = comment;
+	}
+
+	private void validateRating(int rating) {
+		if (rating < MIN_RATING || rating > MAX_RATING) {
+			throw new ProductReviewRatingInvalidException(rating);
+		}
 	}
 }

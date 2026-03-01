@@ -9,14 +9,15 @@
 package com.company.shop.module.product.entity;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.hibernate.annotations.SQLRestriction;
 
 import com.company.shop.common.model.SoftDeleteEntity;
 import com.company.shop.module.category.entity.Category;
+import com.company.shop.module.product.exception.ProductDataInvalidException;
 import com.company.shop.module.product.exception.ProductInsufficientStockException;
 import com.company.shop.module.product.exception.ProductReviewCountInvalidException;
 import com.company.shop.module.product.exception.ProductStockInvalidException;
@@ -76,6 +77,15 @@ public class Product extends SoftDeleteEntity {
 
 	public Product(String name, String slug, String sku, String description, BigDecimal price, int stock,
 			Category category) {
+		validateRequiredText(name, "Product name cannot be blank");
+		validateRequiredText(slug, "Product slug cannot be blank");
+		validateRequiredText(sku, "Product SKU cannot be blank");
+		validatePrice(price);
+		validateStock(stock);
+		if (category == null) {
+			throw new ProductDataInvalidException("Product category is required");
+		}
+
 		this.name = name;
 		this.slug = slug;
 		this.sku = sku;
@@ -110,11 +120,29 @@ public class Product extends SoftDeleteEntity {
 		if (newCount < 0) {
 			throw new ProductReviewCountInvalidException(newCount);
 		}
-		this.averageRating = newAverage;
+
+		double safeAverage = newAverage != null ? newAverage : 0.0;
+		if (newCount == 0) {
+			safeAverage = 0.0;
+		}
+
+		this.averageRating = BigDecimal.valueOf(safeAverage)
+				.setScale(2, RoundingMode.HALF_UP)
+				.doubleValue();
 		this.reviewCount = newCount;
 	}
 
-	public void update(String name, String slug, String sku, String description, BigDecimal price, int stock, Category category) {
+	public void update(String name, String slug, String sku, String description, BigDecimal price, int stock,
+			Category category) {
+		validateRequiredText(name, "Product name cannot be blank");
+		validateRequiredText(slug, "Product slug cannot be blank");
+		validateRequiredText(sku, "Product SKU cannot be blank");
+		validatePrice(price);
+		validateStock(stock);
+		if (category == null) {
+			throw new ProductDataInvalidException("Product category is required");
+		}
+
 		this.name = name;
 		this.slug = slug;
 		this.sku = sku;
@@ -125,20 +153,36 @@ public class Product extends SoftDeleteEntity {
 	}
 
 	public void updateStock(int newStock) {
-		if (newStock < 0) {
-			throw new ProductStockInvalidException(newStock);
-		}
+		validateStock(newStock);
 		this.stock = newStock;
 	}
 
 	public void decreaseStock(int quantityToDecrease) {
 		if (quantityToDecrease <= 0) {
-			throw new ProductStockInvalidException("Quantity to decrease must be greater than zero");
+			throw new ProductStockInvalidException("decrease", quantityToDecrease);
 		}
 		if (this.stock < quantityToDecrease) {
 			throw new ProductInsufficientStockException(this.name, quantityToDecrease, this.stock);
 		}
 		this.stock -= quantityToDecrease;
+	}
+
+	private void validateRequiredText(String value, String message) {
+		if (value == null || value.isBlank()) {
+			throw new ProductDataInvalidException(message);
+		}
+	}
+
+	private void validatePrice(BigDecimal value) {
+		if (value == null || value.signum() < 0) {
+			throw new ProductDataInvalidException("Product price must be zero or greater");
+		}
+	}
+
+	private void validateStock(int value) {
+		if (value < 0) {
+			throw new ProductStockInvalidException(value);
+		}
 	}
 
 	public String getName() {
@@ -178,6 +222,6 @@ public class Product extends SoftDeleteEntity {
 	}
 
 	public List<ProductImage> getImages() {
-		return Collections.unmodifiableList(images);
+		return images == null ? List.of() : List.copyOf(images);
 	}
 }

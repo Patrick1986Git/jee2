@@ -13,9 +13,9 @@ import com.company.shop.module.user.dto.UserUpdateDTO;
 import com.company.shop.module.user.entity.User;
 import com.company.shop.module.user.mapper.UserMapper;
 import com.company.shop.module.user.repository.UserRepository;
+import com.company.shop.module.user.exception.UserNotFoundException;
 import com.company.shop.security.SecurityConstants;
 
-import jakarta.persistence.EntityNotFoundException;
 
 @Service
 @Transactional
@@ -39,7 +39,7 @@ public class UserServiceImpl implements UserService {
 	@Transactional(readOnly = true)
 	public UserResponseDTO findById(UUID id) {
 		return repository.findWithRolesById(id).map(mapper::toDto)
-				.orElseThrow(() -> new EntityNotFoundException("Użytkownik o ID: " + id + " nie został znaleziony"));
+				.orElseThrow(() -> new UserNotFoundException(id.toString()));
 	}
 
 	@Override
@@ -50,13 +50,13 @@ public class UserServiceImpl implements UserService {
 		String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
 		return repository.findByEmailWithRoles(email).map(mapper::toDto).orElseThrow(
-				() -> new EntityNotFoundException("Nie znaleziono profilu zalogowanego użytkownika: " + email));
+				() -> new UserNotFoundException(email));
 	}
 
 	@Override
 	public UserResponseDTO update(UUID id, UserUpdateDTO dto) {
 		User user = repository.findById(id)
-				.orElseThrow(() -> new EntityNotFoundException("Nie można zaktualizować. Użytkownik nie istnieje."));
+				.orElseThrow(() -> new UserNotFoundException(id.toString()));
 
 		user.setFirstName(dto.getFirstName());
 		user.setLastName(dto.getLastName());
@@ -70,7 +70,7 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public void delete(UUID id) {
 		User user = repository.findById(id)
-				.orElseThrow(() -> new EntityNotFoundException("Nie można usunąć. Użytkownik nie istnieje."));
+				.orElseThrow(() -> new UserNotFoundException(id.toString()));
 
 		user.markDeleted();
 	}
@@ -80,7 +80,7 @@ public class UserServiceImpl implements UserService {
 	public User getCurrentUserEntity() {
 		String email = SecurityContextHolder.getContext().getAuthentication().getName();
 		return repository.findByEmailWithRoles(email)
-				.orElseThrow(() -> new EntityNotFoundException("Nie znaleziono użytkownika: " + email));
+				.orElseThrow(() -> new UserNotFoundException(email));
 	}
 
 	@Override

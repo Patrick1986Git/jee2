@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -80,6 +81,19 @@ public class GlobalExceptionHandler {
 		);
 
 		return new ResponseEntity<>(apiError, ex.getStatus());
+	}
+
+
+	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+	public ResponseEntity<ApiError> handleOptimisticLockingFailure(ObjectOptimisticLockingFailureException ex) {
+
+		log.warn("Optimistic locking conflict detected: {}", ex.getMessage());
+
+		ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(),
+				"Resource was modified by another transaction. Please refresh and retry.",
+				"OPTIMISTIC_LOCK_CONFLICT");
+
+		return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
 	}
 
 	/**

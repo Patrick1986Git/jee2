@@ -17,4 +17,10 @@ public class ProductStockInvalidException extends BusinessException {
                 message,
                 "PRODUCT_STOCK_INVALID");
     }
+
+    public ProductStockInvalidException(String operation, int quantity) {
+        super(HttpStatus.CONFLICT,
+                "Invalid stock operation '" + operation + "' for quantity: " + quantity,
+                "PRODUCT_STOCK_INVALID");
+    }
 }

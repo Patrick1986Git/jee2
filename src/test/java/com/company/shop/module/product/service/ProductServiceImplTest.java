@@ -50,7 +50,7 @@ class ProductServiceImplTest {
 
     @Test
     void create_shouldThrowWhenSkuAlreadyExists() {
-        ProductCreateDTO dto = new ProductCreateDTOBuilder().withSku("SKU-123").build();
+        ProductCreateDTO dto = dto("Test Product", "SKU-123", UUID.randomUUID());
         when(productRepository.existsBySku(dto.getSku())).thenReturn(true);
 
         assertThatThrownBy(() -> service.create(dto))
@@ -62,7 +62,7 @@ class ProductServiceImplTest {
 
     @Test
     void create_shouldThrowWhenCategoryNotFound() {
-        ProductCreateDTO dto = new ProductCreateDTOBuilder().build();
+        ProductCreateDTO dto = dto("Test Product", "SKU-123", UUID.randomUUID());
         when(productRepository.existsBySku(dto.getSku())).thenReturn(false);
         when(categoryRepository.findById(dto.getCategoryId())).thenReturn(Optional.empty());
 
@@ -75,7 +75,8 @@ class ProductServiceImplTest {
 
     @Test
     void create_shouldGenerateDeterministicSlugSuffixWhenBaseSlugExists() {
-        ProductCreateDTO dto = new ProductCreateDTOBuilder().withName("Phone Case").build();
+        UUID categoryId = UUID.randomUUID();
+        ProductCreateDTO dto = dto("Phone Case", "SKU-123", categoryId);
         Category category = new Category("Accessories", "accessories", "desc");
 
         when(productRepository.existsBySku(dto.getSku())).thenReturn(false);
@@ -96,10 +97,7 @@ class ProductServiceImplTest {
     void update_shouldUpdateSkuInAggregate() {
         UUID productId = UUID.randomUUID();
         UUID categoryId = UUID.randomUUID();
-        ProductCreateDTO dto = new ProductCreateDTOBuilder()
-                .withSku("NEW-SKU")
-                .withCategoryId(categoryId)
-                .build();
+        ProductCreateDTO dto = dto("Test Product", "NEW-SKU", categoryId);
 
         Category category = new Category("Accessories", "accessories", "desc");
         Product existing = new Product("Old", "old", "OLD-SKU", "desc", BigDecimal.TEN, 2, category);
@@ -116,56 +114,13 @@ class ProductServiceImplTest {
         assertThat(existing.getSku()).isEqualTo("NEW-SKU");
     }
 
+    private ProductCreateDTO dto(String name, String sku, UUID categoryId) {
+        return new ProductCreateDTO(name, sku, "Description", BigDecimal.valueOf(19.99), 10, categoryId,
+                List.of("https://img.example/1.png"));
+    }
+
     private ProductResponseDTO stubResponse() {
         return new ProductResponseDTO(UUID.randomUUID(), "name", "slug", "sku", "desc", BigDecimal.ONE,
                 1, UUID.randomUUID(), "cat", 0.0, 0, List.of());
-    }
-
-    private static class ProductCreateDTOBuilder {
-        private String name = "Test Product";
-        private String sku = "SKU-123";
-        private String description = "Description";
-        private BigDecimal price = BigDecimal.valueOf(19.99);
-        private int stock = 10;
-        private UUID categoryId = UUID.randomUUID();
-        private List<String> imageUrls = List.of("https://img.example/1.png");
-
-        ProductCreateDTOBuilder withName(String name) {
-            this.name = name;
-            return this;
-        }
-
-        ProductCreateDTOBuilder withSku(String sku) {
-            this.sku = sku;
-            return this;
-        }
-
-        ProductCreateDTOBuilder withCategoryId(UUID categoryId) {
-            this.categoryId = categoryId;
-            return this;
-        }
-
-        ProductCreateDTO build() {
-            try {
-                ProductCreateDTO dto = new ProductCreateDTO();
-                setField(dto, "name", name);
-                setField(dto, "sku", sku);
-                setField(dto, "description", description);
-                setField(dto, "price", price);
-                setField(dto, "stock", stock);
-                setField(dto, "categoryId", categoryId);
-                setField(dto, "imageUrls", imageUrls);
-                return dto;
-            } catch (ReflectiveOperationException ex) {
-                throw new IllegalStateException(ex);
-            }
-        }
-
-        private void setField(ProductCreateDTO dto, String fieldName, Object value)
-                throws ReflectiveOperationException {
-            var field = ProductCreateDTO.class.getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(dto, value);
-        }
     }
 }
