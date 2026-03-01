@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import com.company.shop.module.category.entity.Category;
 import com.company.shop.module.product.exception.ProductDataInvalidException;
+import com.company.shop.module.product.exception.ProductInvariantViolationException;
 import com.company.shop.module.product.exception.ProductReviewRatingInvalidException;
 import com.company.shop.module.user.entity.User;
 
@@ -45,6 +46,15 @@ class ProductDomainValidationTest {
     }
 
     @Test
+    void constructor_shouldRejectZeroPrice() {
+        Category category = new Category("Name", "slug", "desc");
+
+        assertThatThrownBy(() -> new Product("Prod", "prod", "SKU", "desc", BigDecimal.ZERO, 1, category))
+                .isInstanceOf(ProductDataInvalidException.class)
+                .hasMessageContaining("greater than zero");
+    }
+
+    @Test
     void review_shouldRejectInvalidRating() {
         Category category = new Category("Name", "slug", "desc");
         Product product = new Product("Prod", "prod", "SKU", "desc", BigDecimal.ONE, 10, category);
@@ -60,8 +70,8 @@ class ProductDomainValidationTest {
         Product product = new Product("Prod", "prod", "SKU", "desc", BigDecimal.ONE, 10, category);
 
         assertThatThrownBy(() -> new ProductReview(product, null, 5, "ok"))
-                .isInstanceOf(ProductDataInvalidException.class)
-                .hasMessageContaining("Review user is required");
+                .isInstanceOf(ProductInvariantViolationException.class)
+                .hasMessageContaining("user association is missing");
     }
 
     @Test
@@ -69,8 +79,8 @@ class ProductDomainValidationTest {
         User user = org.mockito.Mockito.mock(User.class);
 
         assertThatThrownBy(() -> new ProductReview(null, user, 5, "ok"))
-                .isInstanceOf(ProductDataInvalidException.class)
-                .hasMessageContaining("Review product is required");
+                .isInstanceOf(ProductInvariantViolationException.class)
+                .hasMessageContaining("product association is missing");
     }
     @Test
     void review_shouldTrimCommentAndConvertBlankToNull() {

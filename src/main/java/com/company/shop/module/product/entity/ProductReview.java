@@ -4,6 +4,7 @@ import org.hibernate.annotations.SQLRestriction;
 
 import com.company.shop.common.model.SoftDeleteEntity;
 import com.company.shop.module.product.exception.ProductDataInvalidException;
+import com.company.shop.module.product.exception.ProductInvariantViolationException;
 import com.company.shop.module.product.exception.ProductReviewRatingInvalidException;
 import com.company.shop.module.user.entity.User;
 
@@ -83,10 +84,10 @@ public class ProductReview extends SoftDeleteEntity {
 
 	private void validateRequiredAssociations(Product product, User user) {
 		if (product == null) {
-			throw new ProductDataInvalidException("Review product is required");
+			throw new ProductInvariantViolationException("Review entity is in invalid state: product association is missing");
 		}
 		if (user == null) {
-			throw new ProductDataInvalidException("Review user is required");
+			throw new ProductInvariantViolationException("Review entity is in invalid state: user association is missing");
 		}
 	}
 

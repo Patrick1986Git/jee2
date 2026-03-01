@@ -178,8 +178,8 @@ public class Product extends SoftDeleteEntity {
 	}
 
 	private void validatePrice(BigDecimal value) {
-		if (value == null || value.signum() < 0) {
-			throw new ProductDataInvalidException("Product price must be zero or greater");
+		if (value == null || value.signum() <= 0) {
+			throw new ProductDataInvalidException("Product price must be greater than zero");
 		}
 	}
 

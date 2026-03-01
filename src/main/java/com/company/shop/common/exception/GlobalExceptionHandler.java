@@ -13,12 +13,14 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 /**
@@ -54,7 +56,8 @@ public class GlobalExceptionHandler {
 			errors.put(fieldName, errorMessage);
 		});
 
-		log.warn("Input validation failed: {}", errors);
+		String traceId = Objects.toString(MDC.get("traceId"), "-");
+		log.warn("Input validation failed fields={} traceId={}", errors.keySet(), traceId);
 
 		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(), "Validation failed", errors);
 
@@ -101,13 +104,37 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
 	public ResponseEntity<ApiError> handleOptimisticLockingFailure(ObjectOptimisticLockingFailureException ex) {
 
-		log.warn("Optimistic locking conflict detected: {}", ex.getMessage());
+		String traceId = Objects.toString(MDC.get("traceId"), "-");
+		log.warn("Optimistic lock conflict status={} type={} traceId={}",
+				HttpStatus.CONFLICT.value(),
+				ex.getClass().getSimpleName(),
+				traceId);
 
 		ApiError apiError = new ApiError(HttpStatus.CONFLICT.value(),
 				"Resource was modified by another transaction. Please refresh and retry.",
 				"OPTIMISTIC_LOCK_CONFLICT");
 
 		return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<ApiError> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
+				"Invalid request parameter type: " + ex.getName(),
+				"REQUEST_INVALID");
+
+		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+	}
+
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	public ResponseEntity<ApiError> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
+				"Request body is malformed or contains invalid values.",
+				"REQUEST_INVALID");
+
+		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
 	}
 
 	/**
