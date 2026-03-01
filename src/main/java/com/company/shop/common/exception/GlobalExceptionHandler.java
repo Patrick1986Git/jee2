@@ -6,6 +6,7 @@ package com.company.shop.common.exception;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,7 +76,7 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiError> handleBusinessException(BusinessException ex) {
 
 		String errorCode = ex.getErrorCode() != null ? ex.getErrorCode() : "UNKNOWN_BUSINESS_ERROR";
-		String traceId = MDC.get("traceId");
+		String traceId = Objects.toString(MDC.get("traceId"), "-");
 		if (ex.getStatus().is5xxServerError()) {
 			log.error("Business invariant/server exception occurred [{}] status={} type={} traceId={}",
 				errorCode,

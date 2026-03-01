@@ -83,13 +83,13 @@ public class ProductReviewServiceImpl implements ProductReviewService {
 
     private void updateProductRatingStats(Product product) {
         RatingStats stats = reviewRepo.getRatingStatsByProductId(product.getId());
-        long count = stats.reviewCount();
 
+        long count = stats != null ? stats.reviewCount() : 0L;
         if (count > Integer.MAX_VALUE) {
             throw new ProductReviewCountInvalidException("Review count exceeds integer range for product: " + product.getId());
         }
 
-        double avg = stats.averageRating() != null ? stats.averageRating() : 0.0;
+        double avg = (stats != null && stats.averageRating() != null) ? stats.averageRating() : 0.0;
         product.updateRatings(avg, (int) count);
         productRepo.save(product);
     }
