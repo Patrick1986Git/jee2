@@ -17,7 +17,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.validation.FieldError;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -58,11 +57,9 @@ public class GlobalExceptionHandler {
 
 		Map<String, List<String>> errors = new HashMap<>();
 
-		ex.getBindingResult().getAllErrors().forEach(error -> {
-			String fieldName = ((FieldError) error).getField();
-			String errorMessage = error.getDefaultMessage();
-			errors.computeIfAbsent(fieldName, k -> new ArrayList<>()).add(errorMessage);
-		});
+		ex.getBindingResult().getFieldErrors().forEach(error -> addValidationError(errors, error.getField(), error.getDefaultMessage()));
+		ex.getBindingResult().getGlobalErrors()
+				.forEach(error -> addValidationError(errors, "_global", error.getDefaultMessage()));
 
 		String traceId = Objects.toString(MDC.get("traceId"), "-");
 		log.warn("Input validation failed fields={} traceId={}", errors.keySet(), traceId);
@@ -225,6 +222,10 @@ public class GlobalExceptionHandler {
 			current = current.getCause();
 		}
 		return null;
+	}
+
+	private void addValidationError(Map<String, List<String>> errors, String key, String message) {
+		errors.computeIfAbsent(key, k -> new ArrayList<>()).add(message);
 	}
 
 	/**
