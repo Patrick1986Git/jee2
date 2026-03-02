@@ -6,9 +6,9 @@ import com.company.shop.common.exception.BusinessException;
 
 public class UserNotFoundException extends BusinessException {
 
-    public UserNotFoundException(String identifier) {
+    public UserNotFoundException() {
         super(HttpStatus.NOT_FOUND,
-                "User not found: " + identifier,
-                "USER_NOT_FOUND");
+                "User not found",
+                UserErrorCodes.USER_NOT_FOUND);
     }
 }

@@ -16,9 +16,11 @@ import com.company.shop.module.user.repository.UserRepository;
 public class UserDetailsServiceImpl implements UserDetailsService {
 
     private final UserRepository userRepository;
+    private final EmailNormalizer emailNormalizer;
 
-    public UserDetailsServiceImpl(UserRepository userRepository) {
+    public UserDetailsServiceImpl(UserRepository userRepository, EmailNormalizer emailNormalizer) {
         this.userRepository = userRepository;
+        this.emailNormalizer = emailNormalizer;
     }
 
     @Override
@@ -26,9 +28,9 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     public UserDetails loadUserByUsername(String email)
             throws UsernameNotFoundException {
 
-        User user = userRepository.findByEmailWithRoles(email)
-                .orElseThrow(() ->
-                        new UsernameNotFoundException("User not found: " + email));
+        String normalizedEmail = emailNormalizer.normalize(email);
+        User user = userRepository.findActiveByEmailWithRoles(normalizedEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
