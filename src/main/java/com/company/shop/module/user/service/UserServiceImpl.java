@@ -4,18 +4,17 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.company.shop.module.user.dto.UserResponseDTO;
 import com.company.shop.module.user.dto.UserUpdateDTO;
 import com.company.shop.module.user.entity.User;
+import com.company.shop.module.user.exception.UserNotFoundException;
 import com.company.shop.module.user.mapper.UserMapper;
 import com.company.shop.module.user.repository.UserRepository;
-import com.company.shop.module.user.exception.UserNotFoundException;
+import com.company.shop.security.CurrentUserProvider;
 import com.company.shop.security.SecurityConstants;
-
 
 @Service
 @Transactional
@@ -23,54 +22,49 @@ public class UserServiceImpl implements UserService {
 
 	private final UserRepository repository;
 	private final UserMapper mapper;
+	private final CurrentUserProvider currentUserProvider;
 
-	public UserServiceImpl(UserRepository repository, UserMapper mapper) {
+	public UserServiceImpl(UserRepository repository, UserMapper mapper, CurrentUserProvider currentUserProvider) {
 		this.repository = repository;
 		this.mapper = mapper;
+		this.currentUserProvider = currentUserProvider;
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public Page<UserResponseDTO> findAll(Pageable pageable) {
-		return repository.findAll(pageable).map(mapper::toDto);
+		return repository.findAllActive(pageable).map(mapper::toDto);
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public UserResponseDTO findById(UUID id) {
-		return repository.findWithRolesById(id).map(mapper::toDto)
-				.orElseThrow(() -> new UserNotFoundException(id.toString()));
+		return repository.findActiveWithRolesById(id)
+				.map(mapper::toDto)
+				.orElseThrow(UserNotFoundException::new);
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public UserResponseDTO getCurrentUserProfile() {
-		// Pobieramy login (email) z SecurityContextu, który ustawił
-		// JwtAuthenticationFilter
-		String email = SecurityContextHolder.getContext().getAuthentication().getName();
-
-		return repository.findByEmailWithRoles(email).map(mapper::toDto).orElseThrow(
-				() -> new UserNotFoundException(email));
+		return mapper.toDto(getCurrentUserEntity());
 	}
 
 	@Override
 	public UserResponseDTO update(UUID id, UserUpdateDTO dto) {
-		User user = repository.findById(id)
-				.orElseThrow(() -> new UserNotFoundException(id.toString()));
+		User user = repository.findActiveById(id)
+				.orElseThrow(UserNotFoundException::new);
 
-		user.setFirstName(dto.getFirstName());
-		user.setLastName(dto.getLastName());
+		user.setFirstName(dto.getFirstName().trim());
+		user.setLastName(dto.getLastName().trim());
 
-		// Dzięki @Transactional i mechanizmowi Dirty Checking, save() nie jest
-		// wymagane,
-		// ale jawne wywołanie jest dopuszczalne dla czytelności.
 		return mapper.toDto(user);
 	}
 
 	@Override
 	public void delete(UUID id) {
-		User user = repository.findById(id)
-				.orElseThrow(() -> new UserNotFoundException(id.toString()));
+		User user = repository.findActiveById(id)
+				.orElseThrow(UserNotFoundException::new);
 
 		user.markDeleted();
 	}
@@ -78,9 +72,9 @@ public class UserServiceImpl implements UserService {
 	@Override
 	@Transactional(readOnly = true)
 	public User getCurrentUserEntity() {
-		String email = SecurityContextHolder.getContext().getAuthentication().getName();
-		return repository.findByEmailWithRoles(email)
-				.orElseThrow(() -> new UserNotFoundException(email));
+		String email = currentUserProvider.getCurrentUserEmail();
+		return repository.findActiveByEmailWithRoles(email)
+				.orElseThrow(UserNotFoundException::new);
 	}
 
 	@Override
