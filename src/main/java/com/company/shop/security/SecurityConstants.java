@@ -9,8 +9,8 @@ public final class SecurityConstants {
     public static final String TOKEN_PREFIX = "Bearer ";
 
     public static final String[] PUBLIC_ENDPOINTS = {
-            "/",
-            "/auth/**",
+            "/api/v1",
+            "/api/v1/auth/**",
             "/css/**",
             "/js/**",
             "/images/**",

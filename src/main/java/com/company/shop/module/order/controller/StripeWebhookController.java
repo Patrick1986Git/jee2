@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.company.shop.module.order.service.PaymentService;
 
 @RestController
-@RequestMapping("/api/webhooks/stripe")
+@RequestMapping("/api/v1/webhooks/stripe")
 public class StripeWebhookController {
 
 	private final PaymentService paymentService;
