@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -30,8 +31,8 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtFilter;
     private final UserDetailsServiceImpl userDetailsService;
 
-    private static final String WEBHOOKS_URL = "/api/webhooks/**";
-    private static final String ADMIN_URL = "/admin/**";
+    private static final String WEBHOOKS_URL = "/api/v1/webhooks/**";
+    private static final String ADMIN_URL = "/api/v1/admin/**";
 
     public SecurityConfig(JwtAuthenticationFilter jwtFilter,
                           UserDetailsServiceImpl userDetailsService) {
@@ -50,14 +51,22 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(WEBHOOKS_URL).permitAll() // Publiczne webhooki (np. Stripe, PayPal)
+                .requestMatchers(WEBHOOKS_URL).permitAll()
                 .requestMatchers(SecurityConstants.PUBLIC_ENDPOINTS).permitAll()
+                .requestMatchers(HttpMethod.GET,
+                        "/api/v1/products",
+                        "/api/v1/products/search",
+                        "/api/v1/products/slug/**",
+                        "/api/v1/products/category/**",
+                        "/api/v1/products/*/reviews",
+                        "/api/v1/categories",
+                        "/api/v1/categories/slug/**").permitAll()
                 .requestMatchers(ADMIN_URL).hasRole("ADMIN")
                 .anyRequest().authenticated()
-            )   
-            .formLogin(form -> form.disable())	// Wyłączenie domyślnych mechanizmów logowania (używamy JWT)
+            )
+            .formLogin(form -> form.disable())
             .httpBasic(basic -> basic.disable())
-            .userDetailsService(userDetailsService)	// Integracja UserDetailsService i filtra JWT
+            .userDetailsService(userDetailsService)
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -66,10 +75,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
-        // W środowisku produkcyjnym te wartości powinny pochodzić z @Value lub pliku .yml
         configuration.setAllowedOrigins(List.of(
-                "http://localhost:3000", 
+                "http://localhost:3000",
                 "http://localhost:8080"
             ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
@@ -81,7 +88,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
-    
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

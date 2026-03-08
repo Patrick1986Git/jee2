@@ -22,7 +22,7 @@ import com.company.shop.module.product.service.ProductReviewService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/products/reviews")
+@RequestMapping("/api/v1")
 public class ProductReviewController {
 
 	private final ProductReviewService reviewService;
@@ -31,19 +31,19 @@ public class ProductReviewController {
 		this.reviewService = reviewService;
 	}
 
-	@PostMapping
+	@PostMapping("/reviews")
 	@ResponseStatus(HttpStatus.CREATED)
 	@PreAuthorize("isAuthenticated()")
-	public ProductReviewResponseDTO addReview(@Valid @RequestBody ProductReviewRequestDTO dto) {
+	public ProductReviewResponseDTO createReview(@Valid @RequestBody ProductReviewRequestDTO dto) {
 		return reviewService.addReview(dto);
 	}
 
-	@GetMapping("/{productId}")
-	public Page<ProductReviewResponseDTO> getReviews(@PathVariable UUID productId, Pageable pageable) {
+	@GetMapping("/products/{productId}/reviews")
+	public Page<ProductReviewResponseDTO> getProductReviews(@PathVariable UUID productId, Pageable pageable) {
 		return reviewService.getProductReviews(productId, pageable);
 	}
 
-	@DeleteMapping("/{reviewId}")
+	@DeleteMapping("/reviews/{reviewId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@PreAuthorize("isAuthenticated()")
 	public void deleteReview(@PathVariable UUID reviewId) {
