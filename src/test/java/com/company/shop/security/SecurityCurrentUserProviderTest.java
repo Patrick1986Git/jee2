@@ -50,8 +50,13 @@ class SecurityCurrentUserProviderTest {
 
     @Test
     void getCurrentUserEmail_shouldReturnNormalizedPrincipalNameForAuthenticatedUser() {
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken("  John@Example.com ", "secret"));
+    	SecurityContextHolder.getContext().setAuthentication(
+    	        UsernamePasswordAuthenticationToken.authenticated(
+    	                "  John@Example.com ",
+    	                "secret",
+    	                java.util.List.of(new SimpleGrantedAuthority("ROLE_USER"))
+    	        )
+    	);
 
         assertThat(provider.getCurrentUserEmail()).isEqualTo("john@example.com");
     }
