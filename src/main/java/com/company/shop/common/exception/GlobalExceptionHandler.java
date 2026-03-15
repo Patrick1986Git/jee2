@@ -19,6 +19,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -173,6 +174,25 @@ public class GlobalExceptionHandler {
 
 		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
 				"Missing required request parameter: " + ex.getParameterName(),
+				"REQUEST_INVALID",
+				details);
+
+		return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+	}
+
+
+	@ExceptionHandler(MissingRequestHeaderException.class)
+	public ResponseEntity<ApiError> handleMissingRequestHeader(MissingRequestHeaderException ex) {
+
+		String expectedType = "unknown";
+		if (ex.getParameter() != null && ex.getParameter().getParameterType() != null) {
+			expectedType = ex.getParameter().getParameterType().getSimpleName();
+		}
+
+		Map<String, String> details = Map.of("parameter", ex.getHeaderName(), "expectedType", expectedType);
+
+		ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST.value(),
+				"Missing required request header: " + ex.getHeaderName(),
 				"REQUEST_INVALID",
 				details);
 

@@ -28,6 +28,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -139,6 +140,18 @@ class GlobalExceptionHandlerWebMvcTest {
 				.andExpect(jsonPath("$.timestamp", matchesPattern(TIMESTAMP_REGEX)));
 	}
 
+
+	@Test
+	void missingRequestHeader_shouldReturnRequestInvalidContract() throws Exception {
+		mockMvc.perform(get("/test-exceptions/missing-header")).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.message").value("Missing required request header: X-Trace-Id"))
+				.andExpect(jsonPath("$.errorCode").value("REQUEST_INVALID"))
+				.andExpect(jsonPath("$.errors.parameter").value("X-Trace-Id"))
+				.andExpect(jsonPath("$.errors.expectedType").value("String"))
+				.andExpect(jsonPath("$.timestamp", matchesPattern(TIMESTAMP_REGEX)));
+	}
+
 	@Test
 	void malformedJson_shouldReturnRequestInvalidMalformedMessage() throws Exception {
 		mockMvc.perform(
@@ -210,6 +223,11 @@ class GlobalExceptionHandlerWebMvcTest {
 
 		@GetMapping("/missing-param")
 		void missingParam(@RequestParam int page) {
+		}
+
+
+		@GetMapping("/missing-header")
+		void missingHeader(@RequestHeader("X-Trace-Id") String traceId) {
 		}
 
 		@GetMapping("/access-denied")
