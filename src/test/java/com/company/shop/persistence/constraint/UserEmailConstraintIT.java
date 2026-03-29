@@ -12,7 +12,6 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.test.context.ActiveProfiles;
 
 import com.company.shop.module.user.entity.User;
-import com.company.shop.persistence.support.PersistenceFixtures;
 import com.company.shop.persistence.support.PostgresContainerSupport;
 
 import jakarta.persistence.PersistenceException;
@@ -27,7 +26,9 @@ class UserEmailConstraintIT extends PostgresContainerSupport {
 
     @Test
     void persist_shouldThrowWhenEmailDiffersOnlyByCase() {
-        PersistenceFixtures.persistUser(entityManager, "john.doe@example.com");
+        User firstUser = new User("john.doe@example.com", "encoded-pass", "John", "Doe");
+        entityManager.persist(firstUser);
+        entityManager.flush();
 
         User duplicateByCase = new User("JOHN.DOE@EXAMPLE.COM", "encoded-pass-2", "John", "Doe");
 

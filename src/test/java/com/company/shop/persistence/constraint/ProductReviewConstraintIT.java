@@ -16,10 +16,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
+import com.company.shop.module.category.entity.Category;
 import com.company.shop.module.product.entity.Product;
 import com.company.shop.module.product.entity.ProductReview;
 import com.company.shop.module.user.entity.User;
-import com.company.shop.persistence.support.PersistenceFixtures;
 import com.company.shop.persistence.support.PostgresContainerSupport;
 
 import jakarta.persistence.PersistenceException;
@@ -37,9 +37,8 @@ class ProductReviewConstraintIT extends PostgresContainerSupport {
 
     @Test
     void persist_shouldThrowWhenSecondReviewForSameProductAndUserExists() {
-        User user = PersistenceFixtures.persistUser(entityManager, "anna.nowak@example.com");
-        Product product = PersistenceFixtures.persistProduct(entityManager, "Phone X", "phone-x", "SKU-PHONE-X",
-                BigDecimal.valueOf(199.99), 10);
+        User user = persistUser("anna.nowak@example.com");
+        Product product = persistProduct("Phone X", "phone-x", "SKU-PHONE-X");
 
         entityManager.persist(new ProductReview(product, user, 5, "Great"));
         entityManager.flush();
@@ -54,9 +53,8 @@ class ProductReviewConstraintIT extends PostgresContainerSupport {
 
     @Test
     void persist_shouldThrowWhenRatingOutsideAllowedRange() {
-        User user = PersistenceFixtures.persistUser(entityManager, "marta.kowalska@example.com");
-        Product product = PersistenceFixtures.persistProduct(entityManager, "Tablet Z", "tablet-z", "SKU-TABLET-Z",
-                BigDecimal.valueOf(199.99), 10);
+        User user = persistUser("marta.kowalska@example.com");
+        Product product = persistProduct("Tablet Z", "tablet-z", "SKU-TABLET-Z");
 
         UUID reviewId = UUID.randomUUID();
 
@@ -73,5 +71,22 @@ class ProductReviewConstraintIT extends PostgresContainerSupport {
                 "Invalid rating"
         )).isInstanceOf(DataIntegrityViolationException.class)
                 .hasRootCauseInstanceOf(org.postgresql.util.PSQLException.class);
+    }
+
+    private User persistUser(String email) {
+        User user = new User(email, "encoded-pass", "First", "Last");
+        entityManager.persist(user);
+        entityManager.flush();
+        return user;
+    }
+
+    private Product persistProduct(String name, String slug, String sku) {
+        Category category = new Category("Electronics-" + UUID.randomUUID(), "electronics-" + UUID.randomUUID(), "desc");
+        entityManager.persist(category);
+
+        Product product = new Product(name, slug, sku, "desc", BigDecimal.valueOf(199.99), 10, category);
+        entityManager.persist(product);
+        entityManager.flush();
+        return product;
     }
 }

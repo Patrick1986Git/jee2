@@ -9,14 +9,29 @@ public class PasswordMatchesValidator implements ConstraintValidator<PasswordMat
 
 	@Override
 	public boolean isValid(RegisterRequestDTO user, ConstraintValidatorContext context) {
-		boolean isValid = user.getPassword() != null && user.getPassword().equals(user.getPasswordRepeat());
+		if (user == null) {
+			return true;
+		}
 
+		String password = user.getPassword();
+		String passwordRepeat = user.getPasswordRepeat();
+
+		if (isBlank(password) || isBlank(passwordRepeat)) {
+			return true;
+		}
+
+		boolean isValid = password.equals(passwordRepeat);
 		if (!isValid) {
-			context.disableDefaultConstraintViolation(); // Wyłączamy błąd ogólny
+			context.disableDefaultConstraintViolation();
 			context.buildConstraintViolationWithTemplate(context.getDefaultConstraintMessageTemplate())
-					.addPropertyNode("passwordRepeat") // Przypisujemy błąd do pola
+					.addPropertyNode("passwordRepeat")
 					.addConstraintViolation();
 		}
+
 		return isValid;
+	}
+
+	private boolean isBlank(String value) {
+		return value == null || value.trim().isEmpty();
 	}
 }

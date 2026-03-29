@@ -16,7 +16,6 @@ import org.springframework.test.context.ActiveProfiles;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.Payment;
 import com.company.shop.module.user.entity.User;
-import com.company.shop.persistence.support.PersistenceFixtures;
 import com.company.shop.persistence.support.PostgresContainerSupport;
 
 import jakarta.persistence.PersistenceException;
@@ -31,8 +30,8 @@ class PaymentConstraintIT extends PostgresContainerSupport {
 
     @Test
     void persist_shouldThrowWhenSecondPaymentReferencesSameOrder() {
-        User user = PersistenceFixtures.persistUser(entityManager, "payment.user@example.com");
-        Order order = PersistenceFixtures.persistOrder(entityManager, user);
+        User user = persistUser("payment.user@example.com");
+        Order order = persistOrder(user);
 
         entityManager.persist(new Payment(order, "STRIPE", BigDecimal.valueOf(150.00)));
         entityManager.flush();
@@ -45,5 +44,19 @@ class PaymentConstraintIT extends PostgresContainerSupport {
             entityManager.flush();
         }).isInstanceOf(PersistenceException.class)
                 .hasRootCauseInstanceOf(ConstraintViolationException.class);
+    }
+
+    private User persistUser(String email) {
+        User user = new User(email, "encoded-pass", "Payment", "User");
+        entityManager.persist(user);
+        entityManager.flush();
+        return user;
+    }
+
+    private Order persistOrder(User user) {
+        Order order = new Order(user);
+        entityManager.persist(order);
+        entityManager.flush();
+        return order;
     }
 }
