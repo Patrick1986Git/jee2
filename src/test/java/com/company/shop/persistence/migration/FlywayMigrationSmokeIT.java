@@ -10,13 +10,21 @@ import org.flywaydb.core.api.MigrationInfoService;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import com.company.shop.persistence.support.PostgresContainerSupport;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(
+        classes = FlywayMigrationSmokeIT.TestConfig.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE
+)
 @ActiveProfiles("test")
 class FlywayMigrationSmokeIT extends PostgresContainerSupport {
 
@@ -59,5 +67,14 @@ class FlywayMigrationSmokeIT extends PostgresContainerSupport {
 
         assertThat(failedRows).isZero();
         assertThat(successfulRows).isNotNull().isGreaterThan(0);
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @ImportAutoConfiguration({
+            DataSourceAutoConfiguration.class,
+            JdbcTemplateAutoConfiguration.class,
+            FlywayAutoConfiguration.class
+    })
+    static class TestConfig {
     }
 }

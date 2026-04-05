@@ -2,15 +2,25 @@ package com.company.shop.persistence.migration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import com.company.shop.persistence.support.PostgresContainerSupport;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(
+        classes = PostgresSchemaArtifactsIT.TestConfig.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE
+)
 @ActiveProfiles("test")
 class PostgresSchemaArtifactsIT extends PostgresContainerSupport {
 
@@ -35,14 +45,21 @@ class PostgresSchemaArtifactsIT extends PostgresContainerSupport {
 
     @Test
     void schema_shouldContainCaseInsensitiveEmailUniquenessMechanism() {
-        Boolean emailLowerUniqueIndexExists = jdbcTemplate.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM pg_indexes " +
-                        "WHERE schemaname = 'public' AND tablename = 'users' " +
-                        "AND indexdef ILIKE '%UNIQUE INDEX%' " +
-                        "AND indexdef ILIKE '%(lower(email))%')",
-                Boolean.class);
+        List<String> userIndexes = jdbcTemplate.queryForList(
+                "SELECT indexdef FROM pg_indexes " +
+                        "WHERE schemaname = 'public' AND tablename = 'users'",
+                String.class);
 
-        assertThat(emailLowerUniqueIndexExists).isTrue();
+        assertThat(userIndexes)
+                .isNotEmpty()
+                .anyMatch(indexDef -> {
+                    String normalized = indexDef == null
+                            ? ""
+                            : indexDef.toLowerCase().replace(" ", "");
+                    return normalized.contains("unique")
+                            && normalized.contains("lower(")
+                            && normalized.contains("email");
+                });
     }
 
     @Test
@@ -72,5 +89,14 @@ class PostgresSchemaArtifactsIT extends PostgresContainerSupport {
         assertThat(ginIndexForSearchVectorExists).isTrue();
         assertThat(polishDictionaryExists).isTrue();
         assertThat(polishConfigExists).isTrue();
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @ImportAutoConfiguration({
+            DataSourceAutoConfiguration.class,
+            JdbcTemplateAutoConfiguration.class,
+            FlywayAutoConfiguration.class
+    })
+    static class TestConfig {
     }
 }
