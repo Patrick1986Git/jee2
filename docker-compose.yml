@@ -12,7 +12,7 @@ services:
     container_name: enterprise-shop-db
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       # Standard dev credentials - DO NOT use these in production environments
       - POSTGRES_DB=enterprise_shop_dev

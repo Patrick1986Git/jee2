@@ -15,11 +15,9 @@ LABEL maintainer="Your Company Name" \
 # Note: Standard path for tsearch_data in Alpine-based Postgres
 ARG TSEARCH_DIR=/usr/local/share/postgresql/tsearch_data
 
-/**
- * Copy Polish Hunspell dictionaries to the PostgreSQL search data directory.
- * These files are required for the 'polish_hunspell' dictionary 
- * defined in Flyway migration V5.
- */
+# Copy Polish Hunspell dictionaries to the PostgreSQL search data directory.
+# These files are required for the 'polish_hunspell' dictionary
+# defined in Flyway migration V5.
 COPY tsearch_data/polish.dict ${TSEARCH_DIR}/
 COPY tsearch_data/polish.affix ${TSEARCH_DIR}/
 COPY tsearch_data/polish.stop ${TSEARCH_DIR}/
@@ -28,7 +26,5 @@ COPY tsearch_data/polish.stop ${TSEARCH_DIR}/
 # 644 = Owner (read/write), Group (read), Others (read)
 RUN chmod 644 ${TSEARCH_DIR}/polish.*
 
-/**
- * PostgreSQL on Alpine already includes 'unaccent' and other contrib modules.
- * No additional installation steps are required for extensions.
- */
+# PostgreSQL on Alpine already includes 'unaccent' and other contrib modules.
+# No additional installation steps are required for extensions.
