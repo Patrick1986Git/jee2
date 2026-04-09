@@ -35,21 +35,20 @@ class ProductReviewRepositoryIT extends PostgresContainerSupport {
 
     @Test
     void getRatingStatsByProductId_shouldCalculateAverageAndCountUsingOnlyActiveReviews() {
-        Product product = PersistenceFixtures.persistProduct(entityManager, "Monitor", "monitor", "SKU-MONITOR",
-                BigDecimal.valueOf(1499L), 12);
+        Product product = PersistenceFixtures.persistProduct(
+                entityManager, "Monitor", "monitor", "SKU-MONITOR", BigDecimal.valueOf(1499L), 12);
 
         User firstUser = PersistenceFixtures.persistUser(entityManager, uniqueEmail("review.stats"));
         User secondUser = PersistenceFixtures.persistUser(entityManager, uniqueEmail("review.stats"));
         User thirdUser = PersistenceFixtures.persistUser(entityManager, uniqueEmail("review.stats"));
 
-        ProductReview firstReview = new ProductReview(product, firstUser, 5, "Excellent");
-        ProductReview secondReview = new ProductReview(product, secondUser, 3, "Okay");
-        ProductReview deletedReview = new ProductReview(product, thirdUser, 1, "Outdated opinion");
+        PersistenceFixtures.persistProductReview(entityManager, product, firstUser, 5, "Excellent");
+        PersistenceFixtures.persistProductReview(entityManager, product, secondUser, 3, "Okay");
+
+        ProductReview deletedReview =
+                PersistenceFixtures.persistProductReview(entityManager, product, thirdUser, 1, "Outdated opinion");
         deletedReview.markDeleted();
 
-        entityManager.persist(firstReview);
-        entityManager.persist(secondReview);
-        entityManager.persist(deletedReview);
         entityManager.flush();
         entityManager.clear();
 
@@ -62,18 +61,18 @@ class ProductReviewRepositoryIT extends PostgresContainerSupport {
 
     @Test
     void findByProductId_shouldReturnOnlyNotDeletedReviews() {
-        Product product = PersistenceFixtures.persistProduct(entityManager, "Keyboard", "keyboard", "SKU-KEYBOARD",
-                BigDecimal.valueOf(299L), 40);
+        Product product = PersistenceFixtures.persistProduct(
+                entityManager, "Keyboard", "keyboard", "SKU-KEYBOARD", BigDecimal.valueOf(299L), 40);
 
         User activeUser = PersistenceFixtures.persistUser(entityManager, uniqueEmail("review.find"));
         User deletedUser = PersistenceFixtures.persistUser(entityManager, uniqueEmail("review.find"));
 
-        ProductReview activeReview = new ProductReview(product, activeUser, 4, "Solid");
-        ProductReview softDeletedReview = new ProductReview(product, deletedUser, 2, "Not for me");
+        PersistenceFixtures.persistProductReview(entityManager, product, activeUser, 4, "Solid");
+
+        ProductReview softDeletedReview =
+                PersistenceFixtures.persistProductReview(entityManager, product, deletedUser, 2, "Not for me");
         softDeletedReview.markDeleted();
 
-        entityManager.persist(activeReview);
-        entityManager.persist(softDeletedReview);
         entityManager.flush();
         entityManager.clear();
 
