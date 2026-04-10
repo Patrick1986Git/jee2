@@ -15,17 +15,23 @@ import com.company.shop.module.user.entity.User;
 
 public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificationExecutor<User> {
 
-	@Query("SELECT DISTINCT u FROM User u JOIN FETCH u.roles WHERE u.email = :email AND u.deleted = false")
-	Optional<User> findActiveByEmailWithRoles(@Param("email") String email);
+    @Query("""
+            SELECT DISTINCT u
+            FROM User u
+            JOIN FETCH u.roles
+            WHERE lower(u.email) = lower(:email)
+              AND u.deleted = false
+            """)
+    Optional<User> findActiveByEmailWithRoles(@Param("email") String email);
 
-	@Query("SELECT u FROM User u WHERE u.deleted = false")
-	@EntityGraph(attributePaths = "roles")
-	Page<User> findAllActive(Pageable pageable);
+    @Query("SELECT u FROM User u WHERE u.deleted = false")
+    @EntityGraph(attributePaths = "roles")
+    Page<User> findAllActive(Pageable pageable);
 
-	@Query("SELECT u FROM User u WHERE u.id = :id AND u.deleted = false")
-	@EntityGraph(attributePaths = "roles")
-	Optional<User> findActiveWithRolesById(@Param("id") UUID id);
+    @Query("SELECT u FROM User u WHERE u.id = :id AND u.deleted = false")
+    @EntityGraph(attributePaths = "roles")
+    Optional<User> findActiveWithRolesById(@Param("id") UUID id);
 
-	@Query("SELECT u FROM User u WHERE u.id = :id AND u.deleted = false")
-	Optional<User> findActiveById(@Param("id") UUID id);
+    @Query("SELECT u FROM User u WHERE u.id = :id AND u.deleted = false")
+    Optional<User> findActiveById(@Param("id") UUID id);
 }
