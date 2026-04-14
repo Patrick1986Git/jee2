@@ -172,6 +172,34 @@ class CategoryControllerWebMvcTest {
             assertThat(captured.getPageSize()).isEqualTo(20);
             verifyNoMoreInteractions(categoryService);
         }
+
+        @Test
+        void getCategories_shouldReturnBadRequestWhenPageQueryParamIsNotANumber() throws Exception {
+            mockMvc.perform(get(CATEGORIES_URL).param("page", "abc"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.errorCode").value("REQUEST_INVALID"))
+                    .andExpect(jsonPath("$.message").value("Invalid request parameter: page"))
+                    .andExpect(jsonPath("$.errors.parameter").value("page"))
+                    .andExpect(jsonPath("$.timestamp").exists());
+
+            verifyNoMoreInteractions(categoryService);
+        }
+
+        @Test
+        void getCategories_shouldReturnBadRequestWhenSizeQueryParamIsNotANumber() throws Exception {
+            mockMvc.perform(get(CATEGORIES_URL).param("size", "abc"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.errorCode").value("REQUEST_INVALID"))
+                    .andExpect(jsonPath("$.message").value("Invalid request parameter: size"))
+                    .andExpect(jsonPath("$.errors.parameter").value("size"))
+                    .andExpect(jsonPath("$.timestamp").exists());
+
+            verifyNoMoreInteractions(categoryService);
+        }
     }
 
     @Nested
