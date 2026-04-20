@@ -1,6 +1,5 @@
 package com.company.shop.module.order.controller;
 
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
@@ -12,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.company.shop.common.dto.PageResponseDTO;
 import com.company.shop.module.order.dto.OrderCheckoutRequestDTO;
 import com.company.shop.module.order.dto.OrderResponseDTO;
 import com.company.shop.module.order.service.OrderService;
@@ -30,8 +30,8 @@ public class CurrentUserOrderController {
     }
 
     @GetMapping
-    public Page<OrderResponseDTO> getCurrentUserOrders(@PageableDefault(size = 10) Pageable pageable) {
-        return orderService.findMyOrders(pageable);
+    public PageResponseDTO<OrderResponseDTO> getCurrentUserOrders(@PageableDefault(size = 10) Pageable pageable) {
+        return PageResponseDTO.from(orderService.findMyOrders(pageable));
     }
 
     @PostMapping("/checkout")
