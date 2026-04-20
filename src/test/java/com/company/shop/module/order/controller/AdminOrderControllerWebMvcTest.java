@@ -114,7 +114,7 @@ class AdminOrderControllerWebMvcTest {
     void getOrders_shouldReturnStablePagedContractForAdmin() throws Exception {
         OrderResponseDTO order = new OrderResponseDTO(
                 UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                OrderStatus.PENDING,
+                OrderStatus.NEW,
                 new BigDecimal("149.99"),
                 LocalDateTime.of(2026, 1, 10, 12, 30),
                 null);
@@ -131,7 +131,7 @@ class AdminOrderControllerWebMvcTest {
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].id").value("11111111-1111-1111-1111-111111111111"))
-                .andExpect(jsonPath("$.content[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.content[0].status").value("NEW"))
                 .andExpect(jsonPath("$.number").value(0))
                 .andExpect(jsonPath("$.size").value(20))
                 .andExpect(jsonPath("$.numberOfElements").value(1))
