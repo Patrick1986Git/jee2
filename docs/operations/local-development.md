@@ -1,21 +1,25 @@
 # Local development
 
 ## Prerequisites
-- Java 17+
+- Java 21
 - Maven
 - Docker + Docker Compose
 
 ## 1) Start local PostgreSQL
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 This starts `enterprise-shop-db` on `localhost:5432`.
 
 ## 2) Prepare database user/permissions
-The repository includes a helper SQL script at `scripts/db-setup.sql` with commands for creating `enterprise_shop_dev` and `shop_dev`.
+Run the SQL bootstrap script as a PostgreSQL superuser:
 
-Apply equivalent SQL with your local PostgreSQL superuser if your instance is fresh.
+```bash
+psql -h localhost -U postgres -d postgres -f scripts/db-setup.sql
+```
+
+For details about what the script creates and when to run it, see [database.md](./database.md#local-bootstrap-script).
 
 ## 3) Run the application
 ```bash
@@ -30,10 +34,7 @@ Default active profile is `dev` (from `application.yml`).
 - OpenAPI JSON: `http://localhost:8080/api-docs`
 
 ## Important environment variables
-For real payment flow testing, provide Stripe keys via environment:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_PUBLIC_KEY`
-
-JWT can be overridden with:
 - `JWT_SECRET`

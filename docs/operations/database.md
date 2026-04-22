@@ -16,6 +16,12 @@
 - Uses `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`
 - Also keeps `ddl-auto=validate`
 
+## Local bootstrap script
+- Local bootstrap SQL is kept in `scripts/db-setup.sql`.
+- The script is intended for fresh local instances and must be run as PostgreSQL superuser.
+- The script is not idempotent (rerun may fail if role/database already exists).
+- Execution steps are documented in [local-development.md](./local-development.md#2-prepare-database-userpermissions).
+
 ## Schema ownership model
 - Baseline schema is in `V1__schema.sql`.
 - Later migrations extend/adjust schema for reviews, ratings, promotions, full text search, cart, product images, payment tracking, uniqueness constraints, optimistic locking, and email uniqueness handling.
