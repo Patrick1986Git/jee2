@@ -1,22 +1,9 @@
--- Ustawienie hasła dla głównego użytkownika (postgres)
- sudo -u postgres psql
- ALTER USER postgres PASSWORD 'twoje_haslo';
- 
- -- Tworzenie bazy i użytkownika pod Twoją aplikację
- -- Tworzenie bazy danych
- CREATE DATABASE enterprise_shop_dev;
- 
- -- Tworzenie użytkownika
- CREATE USER shop_dev WITH ENCRYPTED PASSWORD 'shop_dev';
- 
- -- Nadanie uprawnień dla bazy użytkownikowi tej bazy
- GRANT ALL PRIVILEGES ON DATABASE enterprise_shop_dev TO shop_dev;
- 
- 
- 
- -- Zalogowanie się jako superużytkownik i nadanie uprawnień
- psql -h localhost -U postgres -d enterprise_shop_dev
- 
-GRANT ALL ON SCHEMA public TO public;
+-- Bootstrap for a fresh local PostgreSQL instance.
+-- Creates only local development role/database (`shop_dev`, `enterprise_shop_dev`).
+-- Application schema/tables are created by Flyway migrations at app startup.
+-- Run as a PostgreSQL superuser (for example: postgres).
+-- Not idempotent: rerunning can fail if role/database already exists.
+
+CREATE USER shop_dev WITH ENCRYPTED PASSWORD 'shop_dev';
+CREATE DATABASE enterprise_shop_dev OWNER shop_dev;
 GRANT ALL PRIVILEGES ON DATABASE enterprise_shop_dev TO shop_dev;
-ALTER SCHEMA public OWNER TO shop_dev;
