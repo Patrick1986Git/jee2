@@ -68,16 +68,31 @@ class CheckConstraintsMigrationIT extends PostgresContainerSupport {
                         "chk_discount_codes_valid_to_after_valid_from",
                         "chk_product_images_sort_order_non_negative");
 
-        assertThat(constraints.get("chk_products_price_non_negative")).contains("price >= 0");
-        assertThat(constraints.get("chk_products_stock_non_negative")).contains("stock >= 0");
-        assertThat(constraints.get("chk_orders_total_amount_non_negative")).contains("total_amount >= 0");
-        assertThat(constraints.get("chk_order_items_quantity_positive")).contains("quantity > 0");
-        assertThat(constraints.get("chk_order_items_price_non_negative")).contains("price >= 0");
-        assertThat(constraints.get("chk_payments_amount_non_negative")).contains("amount >= 0");
-        assertThat(constraints.get("chk_discount_codes_used_count_non_negative")).contains("used_count >= 0");
-        assertThat(constraints.get("chk_discount_codes_usage_limit_positive_or_null")).contains("usage_limit IS NULL").contains("usage_limit > 0");
-        assertThat(constraints.get("chk_discount_codes_valid_to_after_valid_from")).contains("valid_to > valid_from");
-        assertThat(constraints.get("chk_product_images_sort_order_non_negative")).contains("sort_order >= 0");
+        assertConstraintContains(constraints, "chk_products_price_non_negative", "price>=0");
+        assertConstraintContains(constraints, "chk_products_stock_non_negative", "stock>=0");
+        assertConstraintContains(constraints, "chk_orders_total_amount_non_negative", "total_amount>=0");
+        assertConstraintContains(constraints, "chk_order_items_quantity_positive", "quantity>0");
+        assertConstraintContains(constraints, "chk_order_items_price_non_negative", "price>=0");
+        assertConstraintContains(constraints, "chk_payments_amount_non_negative", "amount>=0");
+        assertConstraintContains(constraints, "chk_discount_codes_used_count_non_negative", "used_count>=0");
+        assertConstraintContains(constraints, "chk_discount_codes_usage_limit_positive_or_null", "usage_limitisnull");
+        assertConstraintContains(constraints, "chk_discount_codes_usage_limit_positive_or_null", "usage_limit>0");
+        assertConstraintContains(constraints, "chk_discount_codes_valid_to_after_valid_from", "valid_to>valid_from");
+        assertConstraintContains(constraints, "chk_product_images_sort_order_non_negative", "sort_order>=0");
+    }
+
+    private void assertConstraintContains(Map<String, String> constraints, String constraintName, String expectedRule) {
+        assertThat(normalizeConstraintDefinition(constraints.get(constraintName))).contains(expectedRule);
+    }
+
+    private String normalizeConstraintDefinition(String definition) {
+        return definition == null
+                ? ""
+                : definition.toLowerCase()
+                        .replaceAll("::[a-z_ ]+", "")
+                        .replace("(", "")
+                        .replace(")", "")
+                        .replaceAll("\\s+", "");
     }
 
     @Configuration(proxyBeanMethods = false)
