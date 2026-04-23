@@ -19,6 +19,7 @@
 - `V12` case-insensitive unique index on user email
 - `V13` missing numeric/date check constraints hardening
 - `V14` status/payment-method check constraints hardening
+- `V15` remove unused audit/soft-delete columns from `order_items`
 
 ## Rules for future changes
 1. Add a new migration for every schema change; do not edit old migrations.
