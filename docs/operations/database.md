@@ -34,3 +34,21 @@ Migration `V5__full_text_search.sql` introduces:
 - GIN index for search performance
 
 This is why the repository ships dictionary files under `docker/postgres/tsearch_data`.
+
+## Timestamp and audit model (audit snapshot: 2026-04-22)
+
+### Current baseline
+- Core domain tables created in `V1` use `TIMESTAMP` (without time zone) for `created_at`, `updated_at`, `deleted_at`.
+- JPA audit base classes (`AuditableEntity`, `SoftDeleteEntity`) use `LocalDateTime`, which currently matches the DB column family (`TIMESTAMP`).
+- Soft delete is already part of the model for selected aggregates (`deleted`, `deleted_at`) and is enforced in several places via `@SQLRestriction("deleted = false")` and repository methods.
+
+### Known inconsistencies to address in a dedicated schema-hardening PR
+- `product_images.created_at` is declared explicitly as `TIMESTAMP WITHOUT TIME ZONE`, while other tables use plain `TIMESTAMP` (semantically equivalent in PostgreSQL, but stylistically inconsistent).
+- `order_items` schema/entity mismatch was removed in `V15` by dropping unused audit + soft-delete columns from table `order_items`.
+- `payments` and `discount_codes` use soft-delete columns via inheritance, but unlike `users/categories/products/orders/product_reviews`, they do not use `@SQLRestriction`.
+- Timestamp defaults are not fully uniform (`CURRENT_TIMESTAMP` vs `NOW()`, and several `updated_at` columns have no DB default).
+
+### Recommendation stance (current)
+- Keep existing behavior unchanged for now; avoid editing historical migrations.
+- Prefer introducing `TIMESTAMPTZ` only through additive migration strategy (new columns + backfill + application switch + cleanup) rather than in-place type rewrites.
+- Keep soft delete for business entities where recovery/auditability matters (already true for most aggregates here); evaluate exemptions table-by-table (e.g., strictly dependent child rows).
