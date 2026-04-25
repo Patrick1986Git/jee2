@@ -2,6 +2,8 @@ package com.company.shop.module.order.entity;
 
 import java.math.BigDecimal;
 
+import org.hibernate.annotations.SQLRestriction;
+
 import com.company.shop.common.model.SoftDeleteEntity;
 
 import jakarta.persistence.Column;
@@ -15,6 +17,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "payments")
+@SQLRestriction("deleted = false")
 public class Payment extends SoftDeleteEntity {
 
 	@OneToOne(fetch = FetchType.LAZY)

@@ -25,6 +25,8 @@ import jakarta.persistence.QueryHint;
  * <p>
  * Provides standard CRUD operations and specialized methods for secure 
  * discount code retrieval with concurrency control.
+ * Soft-deleted rows are filtered on entity level via
+ * {@code DiscountCode @SQLRestriction("deleted = false")}.
  * </p>
  *
  * @since 1.0.0
@@ -32,7 +34,7 @@ import jakarta.persistence.QueryHint;
 public interface DiscountCodeRepository extends JpaRepository<DiscountCode, UUID> {
 
     /**
-     * Retrieves an active discount code by its string representation, ignoring case.
+     * Retrieves a discount code by its string representation, ignoring case.
      * <p>
      * <strong>Concurrency Control:</strong> This method applies a {@code PESSIMISTIC_WRITE} 
      * lock to prevent race conditions during the "check-then-update" cycle of the 
@@ -40,10 +42,10 @@ public interface DiscountCodeRepository extends JpaRepository<DiscountCode, UUID
      * </p>
      *
      * @param code the unique discount code string (case-insensitive).
-     * @return an {@link Optional} containing the discount code if found and not deleted.
+     * @return an {@link Optional} containing the discount code if found.
      * @see LockModeType#PESSIMISTIC_WRITE
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints({ @QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000") })
-    Optional<DiscountCode> findByCodeIgnoreCaseAndDeletedFalse(String code);
+    Optional<DiscountCode> findByCodeIgnoreCase(String code);
 }
