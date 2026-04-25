@@ -12,6 +12,7 @@ import com.company.shop.common.model.AuditableEntity;
 import com.company.shop.module.cart.entity.Cart;
 import com.company.shop.module.category.entity.Category;
 import com.company.shop.module.order.entity.Order;
+import com.company.shop.module.order.entity.Payment;
 import com.company.shop.module.product.entity.Product;
 import com.company.shop.module.product.entity.ProductReview;
 import com.company.shop.module.user.entity.User;
@@ -29,10 +30,7 @@ public final class PersistenceFixtures {
 
     public static User persistUser(TestEntityManager entityManager, String email) {
         User user = new User(email, "encoded-pass", "Test", "User");
-        setCreatedAt(user);
-        entityManager.persist(user);
-        entityManager.flush();
-        return user;
+        return persistAndFlush(entityManager, user);
     }
 
     public static Category persistCategory(TestEntityManager entityManager, String baseName) {
@@ -42,10 +40,7 @@ public final class PersistenceFixtures {
                 baseName.toLowerCase(Locale.ROOT) + "-" + suffix,
                 "desc"
         );
-        setCreatedAt(category);
-        entityManager.persist(category);
-        entityManager.flush();
-        return category;
+        return persistAndFlush(entityManager, category);
     }
 
     public static Product persistProduct(TestEntityManager entityManager,
@@ -76,29 +71,68 @@ public final class PersistenceFixtures {
                 stock,
                 category
         );
-        setCreatedAt(product);
-        entityManager.persist(product);
-        entityManager.flush();
-        return product;
+        return persistAndFlush(entityManager, product);
     }
 
     public static Cart persistCart(TestEntityManager entityManager, User user) {
         Cart cart = new Cart(user);
-        setCreatedAt(cart);
-        entityManager.persist(cart);
-        entityManager.flush();
-        return cart;
+        return persistAndFlush(entityManager, cart);
     }
 
     public static Order persistOrder(TestEntityManager entityManager, User user) {
         Order order = new Order(user);
-        setCreatedAt(order);
-        entityManager.persist(order);
-        entityManager.flush();
-        return order;
+        return persistAndFlush(entityManager, order);
     }
 
-    private static void setCreatedAt(Object entity) {
+    public static Payment persistPayment(TestEntityManager entityManager, Order order, String provider, BigDecimal amount) {
+        Payment payment = new Payment(order, provider, amount);
+        return persistAndFlush(entityManager, payment);
+    }
+
+    public static ProductReview persistProductReview(TestEntityManager entityManager,
+                                                     Product product,
+                                                     User user,
+                                                     int rating,
+                                                     String comment) {
+        ProductReview review = new ProductReview(product, user, rating, comment);
+        return persistAndFlush(entityManager, review);
+    }
+
+    public static void insertDiscountCode(TestEntityManager entityManager, String code, boolean deleted) {
+        LocalDateTime now = LocalDateTime.now();
+        entityManager.getEntityManager().createNativeQuery("""
+                INSERT INTO discount_codes (
+                    id, code, discount_percent, valid_from, valid_to, usage_limit, used_count, active,
+                    created_at, deleted, deleted_at
+                ) VALUES (
+                    :id, :code, :discountPercent, :validFrom, :validTo, :usageLimit, :usedCount, :active,
+                    :createdAt, :deleted, :deletedAt
+                )
+                """)
+                .setParameter("id", UUID.randomUUID())
+                .setParameter("code", code)
+                .setParameter("discountPercent", 10)
+                .setParameter("validFrom", now.minusDays(1))
+                .setParameter("validTo", now.plusDays(1))
+                .setParameter("usageLimit", 100)
+                .setParameter("usedCount", 0)
+                .setParameter("active", true)
+                .setParameter("createdAt", now)
+                .setParameter("deleted", deleted)
+                .setParameter("deletedAt", deleted ? now : null)
+                .executeUpdate();
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    public static <T> T persistAndFlush(TestEntityManager entityManager, T entity) {
+        setCreatedAt(entity);
+        entityManager.persist(entity);
+        entityManager.flush();
+        return entity;
+    }
+
+    public static void setCreatedAt(Object entity) {
         try {
             Field field = AuditableEntity.class.getDeclaredField("createdAt");
             field.setAccessible(true);
@@ -110,17 +144,5 @@ public final class PersistenceFixtures {
 
     private static String shortSuffix() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-    }
-    
-    public static ProductReview persistProductReview(TestEntityManager entityManager,
-            Product product,
-            User user,
-            int rating,
-            String comment) {
-    		ProductReview review = new ProductReview(product, user, rating, comment);
-    		setCreatedAt(review);
-    		entityManager.persist(review);
-    		entityManager.flush();
-    		return review;
     }
 }

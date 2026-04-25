@@ -2,9 +2,6 @@ package com.company.shop.persistence.constraint;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.reflect.Field;
-import java.time.LocalDateTime;
-
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,8 +11,8 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.test.context.ActiveProfiles;
 
-import com.company.shop.common.model.AuditableEntity;
 import com.company.shop.module.user.entity.User;
+import com.company.shop.persistence.support.PersistenceFixtures;
 import com.company.shop.persistence.support.PostgresContainerSupport;
 
 @DataJpaTest
@@ -29,8 +26,7 @@ class UserEmailConstraintIT extends PostgresContainerSupport {
     @Test
     void persist_shouldThrowWhenEmailDiffersOnlyByCase() {
         User firstUser = buildUser("john.doe@example.com", "encoded-pass");
-        entityManager.persist(firstUser);
-        entityManager.flush();
+        PersistenceFixtures.persistAndFlush(entityManager, firstUser);
 
         User duplicateByCase = buildUser("JOHN.DOE@EXAMPLE.COM", "encoded-pass-2");
 
@@ -42,18 +38,6 @@ class UserEmailConstraintIT extends PostgresContainerSupport {
     }
 
     private User buildUser(String email, String password) {
-        User user = new User(email, password, "John", "Doe");
-        setCreatedAt(user, LocalDateTime.now());
-        return user;
-    }
-
-    private void setCreatedAt(User user, LocalDateTime createdAt) {
-        try {
-            Field field = AuditableEntity.class.getDeclaredField("createdAt");
-            field.setAccessible(true);
-            field.set(user, createdAt);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Could not set createdAt for test entity", e);
-        }
+        return new User(email, password, "John", "Doe");
     }
 }
