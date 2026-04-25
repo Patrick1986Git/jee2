@@ -98,33 +98,6 @@ public final class PersistenceFixtures {
         return persistAndFlush(entityManager, review);
     }
 
-    public static void insertDiscountCode(TestEntityManager entityManager, String code, boolean deleted) {
-        LocalDateTime now = LocalDateTime.now();
-        entityManager.getEntityManager().createNativeQuery("""
-                INSERT INTO discount_codes (
-                    id, code, discount_percent, valid_from, valid_to, usage_limit, used_count, active,
-                    created_at, deleted, deleted_at
-                ) VALUES (
-                    :id, :code, :discountPercent, :validFrom, :validTo, :usageLimit, :usedCount, :active,
-                    :createdAt, :deleted, :deletedAt
-                )
-                """)
-                .setParameter("id", UUID.randomUUID())
-                .setParameter("code", code)
-                .setParameter("discountPercent", 10)
-                .setParameter("validFrom", now.minusDays(1))
-                .setParameter("validTo", now.plusDays(1))
-                .setParameter("usageLimit", 100)
-                .setParameter("usedCount", 0)
-                .setParameter("active", true)
-                .setParameter("createdAt", now)
-                .setParameter("deleted", deleted)
-                .setParameter("deletedAt", deleted ? now : null)
-                .executeUpdate();
-        entityManager.flush();
-        entityManager.clear();
-    }
-
     public static <T> T persistAndFlush(TestEntityManager entityManager, T entity) {
         setCreatedAt(entity);
         entityManager.persist(entity);

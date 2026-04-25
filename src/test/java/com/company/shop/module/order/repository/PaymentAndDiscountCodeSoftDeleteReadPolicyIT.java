@@ -3,6 +3,7 @@ package com.company.shop.module.order.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -66,10 +67,39 @@ class PaymentAndDiscountCodeSoftDeleteReadPolicyIT extends PostgresContainerSupp
         String activeCode = "ACTIVE10-" + UUID.randomUUID().toString().substring(0, 8);
         String deletedCode = "DELETED10-" + UUID.randomUUID().toString().substring(0, 8);
 
-        PersistenceFixtures.insertDiscountCode(entityManager, activeCode, false);
-        PersistenceFixtures.insertDiscountCode(entityManager, deletedCode, true);
+        insertDiscountCode(activeCode, false);
+        insertDiscountCode(deletedCode, true);
 
         assertThat(discountCodeRepository.findByCodeIgnoreCase(activeCode.toLowerCase())).isPresent();
         assertThat(discountCodeRepository.findByCodeIgnoreCase(deletedCode.toLowerCase())).isEmpty();
+    }
+
+    private void insertDiscountCode(String code, boolean deleted) {
+        LocalDateTime now = LocalDateTime.now();
+
+        entityManager.getEntityManager().createNativeQuery("""
+                INSERT INTO discount_codes (
+                    id, code, discount_percent, valid_from, valid_to, usage_limit, used_count, active,
+                    created_at, deleted, deleted_at
+                ) VALUES (
+                    :id, :code, :discountPercent, :validFrom, :validTo, :usageLimit, :usedCount, :active,
+                    :createdAt, :deleted, :deletedAt
+                )
+                """)
+                .setParameter("id", UUID.randomUUID())
+                .setParameter("code", code)
+                .setParameter("discountPercent", 10)
+                .setParameter("validFrom", now.minusDays(1))
+                .setParameter("validTo", now.plusDays(1))
+                .setParameter("usageLimit", 100)
+                .setParameter("usedCount", 0)
+                .setParameter("active", true)
+                .setParameter("createdAt", now)
+                .setParameter("deleted", deleted)
+                .setParameter("deletedAt", deleted ? now : null)
+                .executeUpdate();
+
+        entityManager.flush();
+        entityManager.clear();
     }
 }
