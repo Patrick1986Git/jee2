@@ -31,6 +31,7 @@ class UserEmailConstraintIT extends PostgresContainerSupport {
         User duplicateByCase = buildUser("JOHN.DOE@EXAMPLE.COM", "encoded-pass-2");
 
         assertThatThrownBy(() -> {
+            PersistenceFixtures.setCreatedAt(duplicateByCase);
             entityManager.persist(duplicateByCase);
             entityManager.flush();
         }).isInstanceOf(ConstraintViolationException.class)
