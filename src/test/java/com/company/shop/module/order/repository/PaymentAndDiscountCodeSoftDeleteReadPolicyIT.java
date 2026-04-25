@@ -2,9 +2,7 @@ package com.company.shop.module.order.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.reflect.Field;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -15,8 +13,6 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.test.context.ActiveProfiles;
 
-import com.company.shop.common.model.AuditableEntity;
-import com.company.shop.module.order.entity.DiscountCode;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.Payment;
 import com.company.shop.module.user.entity.User;
@@ -24,7 +20,7 @@ import com.company.shop.persistence.support.PersistenceFixtures;
 import com.company.shop.persistence.support.PostgresContainerSupport;
 
 /**
- * Verifies repository read policy for soft-deleted {@link Payment} and {@link DiscountCode}.
+ * Verifies repository read policy for soft-deleted {@link Payment} and {@link com.company.shop.module.order.entity.DiscountCode}.
  * <p>
  * Both repositories rely on entity-level {@code @SQLRestriction("deleted = false")}.
  * </p>
@@ -49,12 +45,10 @@ class PaymentAndDiscountCodeSoftDeleteReadPolicyIT extends PostgresContainerSupp
         Order activeOrder = PersistenceFixtures.persistOrder(entityManager, user);
         Order deletedOrder = PersistenceFixtures.persistOrder(entityManager, user);
 
-        Payment activePayment = new Payment(activeOrder, "STRIPE", BigDecimal.valueOf(50));
-        setCreatedAt(activePayment);
-        entityManager.persist(activePayment);
+        PersistenceFixtures.persistPayment(entityManager, activeOrder, "STRIPE", BigDecimal.valueOf(50));
 
         Payment deletedPayment = new Payment(deletedOrder, "STRIPE", BigDecimal.valueOf(50));
-        setCreatedAt(deletedPayment);
+        PersistenceFixtures.setCreatedAt(deletedPayment);
         deletedPayment.markDeleted();
         entityManager.persist(deletedPayment);
         entityManager.flush();
@@ -72,47 +66,10 @@ class PaymentAndDiscountCodeSoftDeleteReadPolicyIT extends PostgresContainerSupp
         String activeCode = "ACTIVE10-" + UUID.randomUUID().toString().substring(0, 8);
         String deletedCode = "DELETED10-" + UUID.randomUUID().toString().substring(0, 8);
 
-        insertDiscountCode(activeCode, false);
-        insertDiscountCode(deletedCode, true);
+        PersistenceFixtures.insertDiscountCode(entityManager, activeCode, false);
+        PersistenceFixtures.insertDiscountCode(entityManager, deletedCode, true);
 
         assertThat(discountCodeRepository.findByCodeIgnoreCase(activeCode.toLowerCase())).isPresent();
         assertThat(discountCodeRepository.findByCodeIgnoreCase(deletedCode.toLowerCase())).isEmpty();
-    }
-
-    private void insertDiscountCode(String code, boolean deleted) {
-        LocalDateTime now = LocalDateTime.now();
-        entityManager.getEntityManager().createNativeQuery("""
-                INSERT INTO discount_codes (
-                    id, code, discount_percent, valid_from, valid_to, usage_limit, used_count, active,
-                    created_at, deleted, deleted_at
-                ) VALUES (
-                    :id, :code, :discountPercent, :validFrom, :validTo, :usageLimit, :usedCount, :active,
-                    :createdAt, :deleted, :deletedAt
-                )
-                """)
-                .setParameter("id", UUID.randomUUID())
-                .setParameter("code", code)
-                .setParameter("discountPercent", 10)
-                .setParameter("validFrom", now.minusDays(1))
-                .setParameter("validTo", now.plusDays(1))
-                .setParameter("usageLimit", 100)
-                .setParameter("usedCount", 0)
-                .setParameter("active", true)
-                .setParameter("createdAt", now)
-                .setParameter("deleted", deleted)
-                .setParameter("deletedAt", deleted ? now : null)
-                .executeUpdate();
-        entityManager.flush();
-        entityManager.clear();
-    }
-
-    private void setCreatedAt(Object entity) {
-        try {
-            Field field = AuditableEntity.class.getDeclaredField("createdAt");
-            field.setAccessible(true);
-            field.set(entity, LocalDateTime.now());
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Could not set createdAt for test entity", e);
-        }
     }
 }
