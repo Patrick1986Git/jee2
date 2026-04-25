@@ -144,7 +144,7 @@ class OrderServiceImplCheckoutTest {
 
 			verify(paymentService).createPaymentIntent(savedOrder);
 			verify(orderMapper).toDto(savedOrder);
-			verify(discountCodeRepository, never()).findByCodeIgnoreCaseAndDeletedFalse(any(String.class));
+			verify(discountCodeRepository, never()).findByCodeIgnoreCase(any(String.class));
 		}
 
 		@Test
@@ -163,7 +163,7 @@ class OrderServiceImplCheckoutTest {
 			when(userService.getCurrentUserEntity()).thenReturn(user);
 			when(cartService.getCartEntityForUser(user.getId())).thenReturn(cart);
 			when(productRepository.findByIdWithLock(product.getId())).thenReturn(Optional.of(product));
-			when(discountCodeRepository.findByCodeIgnoreCaseAndDeletedFalse("SAVE10"))
+			when(discountCodeRepository.findByCodeIgnoreCase("SAVE10"))
 					.thenReturn(Optional.of(discountCode));
 			when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
 				Order order = invocation.getArgument(0);
@@ -190,7 +190,7 @@ class OrderServiceImplCheckoutTest {
 			verify(paymentRepository).save(paymentCaptor.capture());
 			assertThat(paymentCaptor.getValue().getAmount()).isEqualByComparingTo("90.00");
 
-			verify(discountCodeRepository).findByCodeIgnoreCaseAndDeletedFalse("SAVE10");
+			verify(discountCodeRepository).findByCodeIgnoreCase("SAVE10");
 			verify(paymentService).createPaymentIntent(savedOrder);
 			verify(orderMapper).toDto(savedOrder);
 		}
@@ -228,7 +228,7 @@ class OrderServiceImplCheckoutTest {
 			Order savedOrder = orderCaptor.getValue();
 			assertThat(savedOrder.getTotalAmount()).isEqualByComparingTo("40.00");
 
-			verify(discountCodeRepository, never()).findByCodeIgnoreCaseAndDeletedFalse(any(String.class));
+			verify(discountCodeRepository, never()).findByCodeIgnoreCase(any(String.class));
 			verify(paymentService).createPaymentIntent(savedOrder);
 			verify(orderMapper).toDto(savedOrder);
 		}
@@ -304,7 +304,7 @@ class OrderServiceImplCheckoutTest {
 			when(userService.getCurrentUserEntity()).thenReturn(user);
 			when(cartService.getCartEntityForUser(user.getId())).thenReturn(cart);
 			when(productRepository.findByIdWithLock(product.getId())).thenReturn(Optional.of(product));
-			when(discountCodeRepository.findByCodeIgnoreCaseAndDeletedFalse("SAVE20")).thenReturn(Optional.empty());
+			when(discountCodeRepository.findByCodeIgnoreCase("SAVE20")).thenReturn(Optional.empty());
 
 			assertThatThrownBy(() -> service.placeOrderFromCart(new OrderCheckoutRequestDTO(" SAVE20 ", null)))
 					.isInstanceOf(DiscountCodeInvalidException.class).hasMessageContaining("SAVE20");
@@ -312,7 +312,7 @@ class OrderServiceImplCheckoutTest {
 			verify(userService).getCurrentUserEntity();
 			verify(cartService).getCartEntityForUser(user.getId());
 			verify(productRepository).findByIdWithLock(product.getId());
-			verify(discountCodeRepository).findByCodeIgnoreCaseAndDeletedFalse("SAVE20");
+			verify(discountCodeRepository).findByCodeIgnoreCase("SAVE20");
 			verifyNoInteractions(orderRepository, paymentRepository, paymentService, orderMapper);
 		}
 
@@ -327,7 +327,7 @@ class OrderServiceImplCheckoutTest {
 			when(userService.getCurrentUserEntity()).thenReturn(user);
 			when(cartService.getCartEntityForUser(user.getId())).thenReturn(cart);
 			when(productRepository.findByIdWithLock(product.getId())).thenReturn(Optional.of(product));
-			when(discountCodeRepository.findByCodeIgnoreCaseAndDeletedFalse("EXPIRED10"))
+			when(discountCodeRepository.findByCodeIgnoreCase("EXPIRED10"))
 					.thenReturn(Optional.of(discountCode));
 
 			assertThatThrownBy(() -> service.placeOrderFromCart(new OrderCheckoutRequestDTO("EXPIRED10", null)))
@@ -336,7 +336,7 @@ class OrderServiceImplCheckoutTest {
 			verify(userService).getCurrentUserEntity();
 			verify(cartService).getCartEntityForUser(user.getId());
 			verify(productRepository).findByIdWithLock(product.getId());
-			verify(discountCodeRepository).findByCodeIgnoreCaseAndDeletedFalse("EXPIRED10");
+			verify(discountCodeRepository).findByCodeIgnoreCase("EXPIRED10");
 			verifyNoInteractions(orderRepository, paymentRepository, paymentService, orderMapper);
 		}
 	}

@@ -9,6 +9,9 @@
 package com.company.shop.module.order.entity;
 
 import java.time.LocalDateTime;
+
+import org.hibernate.annotations.SQLRestriction;
+
 import com.company.shop.common.model.SoftDeleteEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,6 +29,7 @@ import jakarta.persistence.Table;
  */
 @Entity
 @Table(name = "discount_codes")
+@SQLRestriction("deleted = false")
 public class DiscountCode extends SoftDeleteEntity {
 
     @Column(nullable = false, unique = true, length = 50)

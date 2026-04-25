@@ -112,7 +112,7 @@ public class OrderServiceImpl implements OrderService {
 
         if (request.discountCode() != null && !request.discountCode().isBlank()) {
             String normalizedDiscountCode = request.discountCode().trim();
-            DiscountCode dc = discountCodeRepo.findByCodeIgnoreCaseAndDeletedFalse(normalizedDiscountCode)
+            DiscountCode dc = discountCodeRepo.findByCodeIgnoreCase(normalizedDiscountCode)
                     .orElseThrow(() -> new DiscountCodeInvalidException(normalizedDiscountCode));
 
             if (!dc.canBeUsed()) {
