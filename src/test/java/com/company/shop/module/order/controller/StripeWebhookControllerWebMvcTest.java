@@ -21,6 +21,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,6 +35,7 @@ import com.company.shop.security.jwt.JwtAuthenticationFilter;
 		controllers = StripeWebhookController.class,
 		excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class)
 )
+@ActiveProfiles("test")
 @AutoConfigureMockMvc(addFilters = false)
 @Import(GlobalExceptionHandler.class)
 class StripeWebhookControllerWebMvcTest {
@@ -76,6 +78,22 @@ class StripeWebhookControllerWebMvcTest {
 				.andExpect(jsonPath("$.errorCode").value("REQUEST_INVALID"))
 				.andExpect(jsonPath("$.errors.parameter").value("Stripe-Signature"))
 				.andExpect(jsonPath("$.errors.expectedType").value("String"))
+				.andExpect(jsonPath("$.timestamp", matchesPattern(TIMESTAMP_REGEX)));
+
+		verifyNoInteractions(paymentService);
+	}
+
+	@Test
+	void handleStripeWebhook_shouldReturnBadRequestWhenRequestBodyMissing() throws Exception {
+		String signature = "sig_test";
+
+		mockMvc.perform(post(WEBHOOK_URL)
+				.contentType(MediaType.APPLICATION_JSON)
+				.header(STRIPE_SIGNATURE, signature))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.message").value("Request body contains invalid values."))
+				.andExpect(jsonPath("$.errorCode").value("REQUEST_INVALID"))
 				.andExpect(jsonPath("$.timestamp", matchesPattern(TIMESTAMP_REGEX)));
 
 		verifyNoInteractions(paymentService);
