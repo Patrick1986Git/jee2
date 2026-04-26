@@ -194,6 +194,58 @@ class StripeWebhookPersistenceIT extends PostgresContainerSupport {
 		verifyNoInteractions(cartService);
 	}
 
+	@Test
+	void handleStripeWebhook_shouldKeepPersistenceStateUnchangedWhenPaymentIntentMetadataDoesNotContainOrderId() throws Exception {
+		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(45), "pi_missing_order_metadata");
+
+		Event event = succeededEventWithoutOrderIdMetadata("pi_missing_order_metadata", 4500L, "pln");
+
+		try (var webhookStatic = mockStatic(Webhook.class)) {
+			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
+					.thenReturn(event);
+
+			mockMvc.perform(post(WEBHOOK_URL)
+					.contentType(MediaType.APPLICATION_JSON)
+					.header("Stripe-Signature", "sig")
+					.content("payload"))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.errorCode").value("STRIPE_WEBHOOK_SIGNATURE_INVALID"));
+		}
+
+		Order unchangedOrder = orderRepository.findById(seededOrder.order().getId()).orElseThrow();
+		Payment unchangedPayment = paymentRepository.findByOrderId(seededOrder.order().getId()).orElseThrow();
+
+		assertThat(unchangedOrder.getStatus()).isEqualTo(OrderStatus.NEW);
+		assertThat(unchangedPayment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+		verifyNoInteractions(cartService);
+	}
+
+	@Test
+	void handleStripeWebhook_shouldKeepPersistenceStateUnchangedWhenProviderPaymentIdDoesNotMatchWebhookPaymentIntentId() throws Exception {
+		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(65), "pi_stored_id");
+
+		Event event = succeededEvent(seededOrder.order().getId().toString(), "pi_other_id", 6500L, "pln");
+
+		try (var webhookStatic = mockStatic(Webhook.class)) {
+			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
+					.thenReturn(event);
+
+			mockMvc.perform(post(WEBHOOK_URL)
+					.contentType(MediaType.APPLICATION_JSON)
+					.header("Stripe-Signature", "sig")
+					.content("payload"))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.errorCode").value("STRIPE_WEBHOOK_SIGNATURE_INVALID"));
+		}
+
+		Order unchangedOrder = orderRepository.findById(seededOrder.order().getId()).orElseThrow();
+		Payment unchangedPayment = paymentRepository.findByOrderId(seededOrder.order().getId()).orElseThrow();
+
+		assertThat(unchangedOrder.getStatus()).isEqualTo(OrderStatus.NEW);
+		assertThat(unchangedPayment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+		verifyNoInteractions(cartService);
+	}
+
 	private SeededOrder seedOrderWithPayment(BigDecimal orderAmount, String paymentIntentId) {
 		User user = userRepository.save(new User("stripe-webhook-" + paymentIntentId + "@example.com", "encoded-pass", "Test", "User"));
 
@@ -217,6 +269,22 @@ class StripeWebhookPersistenceIT extends PostgresContainerSupport {
 		when(event.getDataObjectDeserializer()).thenReturn(deserializer);
 		when(deserializer.getObject()).thenReturn(java.util.Optional.of(paymentIntent));
 		when(paymentIntent.getMetadata()).thenReturn(Map.of("orderId", orderId));
+		when(paymentIntent.getAmountReceived()).thenReturn(amountReceived);
+		when(paymentIntent.getCurrency()).thenReturn(currency);
+		when(paymentIntent.getId()).thenReturn(paymentIntentId);
+
+		return event;
+	}
+
+	private Event succeededEventWithoutOrderIdMetadata(String paymentIntentId, long amountReceived, String currency) {
+		Event event = mock(Event.class);
+		EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
+		PaymentIntent paymentIntent = mock(PaymentIntent.class);
+
+		when(event.getType()).thenReturn("payment_intent.succeeded");
+		when(event.getDataObjectDeserializer()).thenReturn(deserializer);
+		when(deserializer.getObject()).thenReturn(java.util.Optional.of(paymentIntent));
+		when(paymentIntent.getMetadata()).thenReturn(Map.of());
 		when(paymentIntent.getAmountReceived()).thenReturn(amountReceived);
 		when(paymentIntent.getCurrency()).thenReturn(currency);
 		when(paymentIntent.getId()).thenReturn(paymentIntentId);
