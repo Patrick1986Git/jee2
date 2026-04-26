@@ -14,7 +14,7 @@ This `docs/` folder contains only documentation that is currently justified by t
 - [`api/overview.md`](./api/overview.md) — endpoint inventory grouped by area, with auth expectations.
 
 ### Testing
-- [`testing/strategy.md`](./testing/strategy.md) — current testing profile (unit + WebMvc), coverage focus, and commands.
+- [`testing/strategy.md`](./testing/strategy.md) — current testing profile (unit/WebMvc/`@DataJpaTest` + PostgreSQL Testcontainers support), coverage focus, and commands.
 
 ### Operations
 - [`operations/local-development.md`](./operations/local-development.md) — local setup and app startup flow.

@@ -8,10 +8,12 @@ The repository currently emphasizes:
 2. **Security and contract-focused WebMvc tests**
    - Security filter-chain behavior and auth endpoint behavior.
    - Global exception contract serialization/shape checks.
-3. **Validation-focused tests**
-   - DTO and custom validator tests.
-4. **Domain invariant tests**
-   - Product entity/domain validation tests.
+3. **Repository-level persistence tests (`@DataJpaTest`)**
+   - Includes repository behavior and persistence constraints coverage.
+4. **Persistence integration tests with PostgreSQL Testcontainers support**
+   - Shared PostgreSQL container support is used for persistence integration scenarios.
+5. **Validation-focused and domain invariant tests**
+   - DTO/custom validator coverage and product domain validation tests.
 
 ## Frameworks/patterns in use
 - JUnit 5
