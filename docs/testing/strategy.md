@@ -20,10 +20,12 @@ The repository currently emphasizes:
 - Spring MVC slice tests (`@WebMvcTest`)
 - Spring Security test support
 
-## Not present yet
+Mockito static mocking is used in service tests (for example Stripe SDK static entry points), so the build config starts tests with Mockito as an explicit `-javaagent` to avoid JDK 21+ dynamic self-attach warnings and keep test execution compatible with stricter future JDK defaults.
+
+## Integration coverage snapshot
 - No full `@SpringBootTest` integration suite in `src/test/java`.
-- No repository-level `@DataJpaTest` suite at the moment.
-- Testcontainers dependency exists in `pom.xml`, but containerized integration tests are not currently part of the committed test set.
+- Repository-level `@DataJpaTest` integration tests are present.
+- Persistence integration tests run against PostgreSQL via shared Testcontainers support.
 
 ## Practical test command set
 Use Maven directly (no Maven wrapper in repo):
@@ -36,4 +38,4 @@ mvn -q -DskipTests compile
 Use `mvn clean test` when validating broad doc/code updates before release prep.
 
 ## Recommendation for next incremental improvement
-If one new integration test area is added, prioritize **Stripe webhook + persistence interaction** (order status + payment status + cart clear) because it is cross-module and business-critical.
+If one new integration test area is added, prioritize **Stripe webhook + persistence interaction** (order status + payment status + cart clear), because it is cross-module and business-critical.
