@@ -35,6 +35,12 @@ class OrderItemsColumnsMigrationIT extends PostgresContainerSupport {
                 String.class);
 
         assertThat(orderItemsColumns)
+        		.contains(
+        				"id",
+        				"order_id",
+        				"product_id",
+        				"quantity",
+        				"price")
                 .doesNotContain(
                         "created_at",
                         "created_by",
