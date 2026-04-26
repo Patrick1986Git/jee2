@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -138,6 +139,58 @@ class StripeWebhookPersistenceIT extends PostgresContainerSupport {
 
 		assertThat(unchangedOrder.getStatus()).isEqualTo(OrderStatus.PAID);
 		assertThat(unchangedPayment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+		verifyNoInteractions(cartService);
+	}
+
+	@Test
+	void handleStripeWebhook_shouldKeepPersistenceStateUnchangedWhenPaymentAmountDoesNotMatchOrderTotal() throws Exception {
+		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(35), "pi_amount_mismatch");
+
+		Event event = succeededEvent(seededOrder.order().getId().toString(), "pi_amount_mismatch", 3499L, "pln");
+
+		try (var webhookStatic = mockStatic(Webhook.class)) {
+			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
+					.thenReturn(event);
+
+			mockMvc.perform(post(WEBHOOK_URL)
+					.contentType(MediaType.APPLICATION_JSON)
+					.header("Stripe-Signature", "sig")
+					.content("payload"))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.errorCode").value("STRIPE_WEBHOOK_SIGNATURE_INVALID"));
+		}
+
+		Order unchangedOrder = orderRepository.findById(seededOrder.order().getId()).orElseThrow();
+		Payment unchangedPayment = paymentRepository.findByOrderId(seededOrder.order().getId()).orElseThrow();
+
+		assertThat(unchangedOrder.getStatus()).isEqualTo(OrderStatus.NEW);
+		assertThat(unchangedPayment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+		verifyNoInteractions(cartService);
+	}
+
+	@Test
+	void handleStripeWebhook_shouldKeepPersistenceStateUnchangedWhenPaymentCurrencyDoesNotMatchOrderCurrency() throws Exception {
+		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(55), "pi_currency_mismatch");
+
+		Event event = succeededEvent(seededOrder.order().getId().toString(), "pi_currency_mismatch", 5500L, "eur");
+
+		try (var webhookStatic = mockStatic(Webhook.class)) {
+			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
+					.thenReturn(event);
+
+			mockMvc.perform(post(WEBHOOK_URL)
+					.contentType(MediaType.APPLICATION_JSON)
+					.header("Stripe-Signature", "sig")
+					.content("payload"))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.errorCode").value("STRIPE_WEBHOOK_SIGNATURE_INVALID"));
+		}
+
+		Order unchangedOrder = orderRepository.findById(seededOrder.order().getId()).orElseThrow();
+		Payment unchangedPayment = paymentRepository.findByOrderId(seededOrder.order().getId()).orElseThrow();
+
+		assertThat(unchangedOrder.getStatus()).isEqualTo(OrderStatus.NEW);
+		assertThat(unchangedPayment.getStatus()).isEqualTo(PaymentStatus.PENDING);
 		verifyNoInteractions(cartService);
 	}
 
