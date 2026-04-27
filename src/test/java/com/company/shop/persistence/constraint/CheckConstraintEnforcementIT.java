@@ -76,6 +76,20 @@ class CheckConstraintEnforcementIT extends PostgresContainerSupport {
     }
 
     @Test
+    void insert_shouldFailWhenPaymentStatusIsOutsideApplicationContract() {
+        UUID userId = insertUser();
+        UUID orderId = insertOrder(userId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "INSERT INTO payments(order_id, payment_method, status, amount) VALUES (?, ?, ?, ?)",
+                orderId,
+                "STRIPE",
+                "AUTHORIZED",
+                BigDecimal.valueOf(99.99)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void insert_shouldFailWhenOrderStatusIsOutsideApplicationContract() {
         UUID userId = insertUser();
 
