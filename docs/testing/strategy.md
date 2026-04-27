@@ -28,6 +28,8 @@ Mockito static mocking is used in service tests (for example Stripe SDK static e
 - No full `@SpringBootTest` integration suite in `src/test/java`.
 - Repository-level `@DataJpaTest` integration tests are present.
 - Persistence integration tests run against PostgreSQL via shared Testcontainers support.
+- Dedicated migration verification tests are present for Flyway smoke checks and schema-hardening migrations (`V13`, `V14`, `V15`).
+- Stripe webhook flow is covered both at controller contract level (`@WebMvcTest`) and as persistence integration (`StripeWebhookPersistenceIT`).
 
 ## Practical test command set
 Use Maven directly (no Maven wrapper in repo):
@@ -40,4 +42,4 @@ mvn -q -DskipTests compile
 Use `mvn clean test` when validating broad doc/code updates before release prep.
 
 ## Recommendation for next incremental improvement
-If one new integration test area is added, prioritize **Stripe webhook + persistence interaction** (order status + payment status + cart clear), because it is cross-module and business-critical.
+Given current coverage, the next incremental step should target one additional end-to-end business-critical path (for example a checkout unhappy-path scenario spanning order creation + payment failure handling) while keeping tests focused and reviewable.

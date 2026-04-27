@@ -25,6 +25,10 @@
 ## Schema ownership model
 - Baseline schema is in `V1__schema.sql`.
 - Later migrations extend/adjust schema for reviews, ratings, promotions, full text search, cart, product images, payment tracking, uniqueness constraints, optimistic locking, and email uniqueness handling.
+- Recent hardening migrations also added/cleaned DB invariants:
+  - `V13` adds missing numeric/date check constraints.
+  - `V14` adds allowed-value constraints for order/payment statuses and payment method.
+  - `V15` removes unused audit/soft-delete columns from `order_items`.
 
 ## Full-text search specifics
 Migration `V5__full_text_search.sql` introduces:
@@ -44,7 +48,6 @@ This is why the repository ships dictionary files under `docker/postgres/tsearch
 
 ### Known inconsistencies to address in a dedicated schema-hardening PR
 - `product_images.created_at` is declared explicitly as `TIMESTAMP WITHOUT TIME ZONE`, while other tables use plain `TIMESTAMP` (semantically equivalent in PostgreSQL, but stylistically inconsistent).
-- `order_items` schema/entity mismatch was removed in `V15` by dropping unused audit + soft-delete columns from table `order_items`.
 - Soft-delete filtering is not yet fully uniform across all aggregates and may evolve in dedicated soft-delete hardening work.
 - Timestamp defaults are not fully uniform (`CURRENT_TIMESTAMP` vs `NOW()`, and several `updated_at` columns have no DB default).
 
