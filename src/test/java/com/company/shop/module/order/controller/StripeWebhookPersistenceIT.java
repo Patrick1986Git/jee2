@@ -69,7 +69,12 @@ class StripeWebhookPersistenceIT extends PostgresContainerSupport {
 	void handleStripeWebhook_shouldPersistOrderAndPaymentAsCompletedWhenPaymentIntentSucceeded() throws Exception {
 		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(25), "pi_success");
 
-		Event event = succeededEvent(seededOrder.order().getId().toString(), "pi_success", 2500L, "pln");
+		Event event = succeededEvent(
+				"evt_persistence_success",
+				seededOrder.order().getId().toString(),
+				"pi_success",
+				2500L,
+				"pln");
 
 		try (var webhookStatic = mockStatic(Webhook.class)) {
 			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
@@ -95,6 +100,7 @@ class StripeWebhookPersistenceIT extends PostgresContainerSupport {
 		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(30), "pi_pending");
 
 		Event event = mock(Event.class);
+		when(event.getId()).thenReturn("evt_persistence_unsupported");
 		when(event.getType()).thenReturn("payment_intent.processing");
 
 		try (var webhookStatic = mockStatic(Webhook.class)) {
@@ -121,7 +127,12 @@ class StripeWebhookPersistenceIT extends PostgresContainerSupport {
 		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(40), "pi_duplicate");
 		markOrderAndPaymentAsCompleted(seededOrder.order().getId());
 
-		Event event = succeededEvent(seededOrder.order().getId().toString(), "pi_duplicate", 4000L, "pln");
+		Event event = succeededEvent(
+				"evt_persistence_already_paid",
+				seededOrder.order().getId().toString(),
+				"pi_duplicate",
+				4000L,
+				"pln");
 
 		try (var webhookStatic = mockStatic(Webhook.class)) {
 			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
@@ -146,7 +157,12 @@ class StripeWebhookPersistenceIT extends PostgresContainerSupport {
 	void handleStripeWebhook_shouldKeepPersistenceStateUnchangedWhenPaymentAmountDoesNotMatchOrderTotal() throws Exception {
 		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(35), "pi_amount_mismatch");
 
-		Event event = succeededEvent(seededOrder.order().getId().toString(), "pi_amount_mismatch", 3499L, "pln");
+		Event event = succeededEvent(
+				"evt_persistence_amount_mismatch",
+				seededOrder.order().getId().toString(),
+				"pi_amount_mismatch",
+				3499L,
+				"pln");
 
 		try (var webhookStatic = mockStatic(Webhook.class)) {
 			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
@@ -172,7 +188,73 @@ class StripeWebhookPersistenceIT extends PostgresContainerSupport {
 	void handleStripeWebhook_shouldKeepPersistenceStateUnchangedWhenPaymentCurrencyDoesNotMatchOrderCurrency() throws Exception {
 		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(55), "pi_currency_mismatch");
 
-		Event event = succeededEvent(seededOrder.order().getId().toString(), "pi_currency_mismatch", 5500L, "eur");
+		Event event = succeededEvent(
+				"evt_persistence_currency_mismatch",
+				seededOrder.order().getId().toString(),
+				"pi_currency_mismatch",
+				5500L,
+				"eur");
+
+		try (var webhookStatic = mockStatic(Webhook.class)) {
+			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
+					.thenReturn(event);
+
+			mockMvc.perform(post(WEBHOOK_URL)
+					.contentType(MediaType.APPLICATION_JSON)
+					.header("Stripe-Signature", "sig")
+					.content("payload"))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.errorCode").value("STRIPE_WEBHOOK_SIGNATURE_INVALID"));
+		}
+
+		Order unchangedOrder = orderRepository.findById(seededOrder.order().getId()).orElseThrow();
+		Payment unchangedPayment = paymentRepository.findByOrderId(seededOrder.order().getId()).orElseThrow();
+
+		assertThat(unchangedOrder.getStatus()).isEqualTo(OrderStatus.NEW);
+		assertThat(unchangedPayment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+		verifyNoInteractions(cartService);
+	}
+
+	@Test
+	void handleStripeWebhook_shouldKeepPersistenceStateUnchangedWhenPaymentIntentMetadataDoesNotContainOrderId() throws Exception {
+		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(45), "pi_missing_order_metadata");
+
+		Event event = succeededEventWithoutOrderIdMetadata(
+				"evt_persistence_missing_order_id_metadata",
+				"pi_missing_order_metadata",
+				4500L,
+				"pln");
+
+		try (var webhookStatic = mockStatic(Webhook.class)) {
+			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
+					.thenReturn(event);
+
+			mockMvc.perform(post(WEBHOOK_URL)
+					.contentType(MediaType.APPLICATION_JSON)
+					.header("Stripe-Signature", "sig")
+					.content("payload"))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.errorCode").value("STRIPE_WEBHOOK_SIGNATURE_INVALID"));
+		}
+
+		Order unchangedOrder = orderRepository.findById(seededOrder.order().getId()).orElseThrow();
+		Payment unchangedPayment = paymentRepository.findByOrderId(seededOrder.order().getId()).orElseThrow();
+
+		assertThat(unchangedOrder.getStatus()).isEqualTo(OrderStatus.NEW);
+		assertThat(unchangedPayment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+		verifyNoInteractions(cartService);
+	}
+
+	@Test
+	void handleStripeWebhook_shouldKeepPersistenceStateUnchangedWhenProviderPaymentIdDoesNotMatchWebhookPaymentIntentId() throws Exception {
+		SeededOrder seededOrder = seedOrderWithPayment(BigDecimal.valueOf(65), "pi_stored_id");
+
+		Event event = succeededEvent(
+				"evt_persistence_provider_payment_id_mismatch",
+				seededOrder.order().getId().toString(),
+				"pi_other_id",
+				6500L,
+				"pln");
 
 		try (var webhookStatic = mockStatic(Webhook.class)) {
 			webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_placeholder"))
@@ -208,15 +290,37 @@ class StripeWebhookPersistenceIT extends PostgresContainerSupport {
 		return new SeededOrder(user, savedOrder);
 	}
 
-	private Event succeededEvent(String orderId, String paymentIntentId, long amountReceived, String currency) {
+	private Event succeededEvent(String eventId, String orderId, String paymentIntentId, long amountReceived, String currency) {
 		Event event = mock(Event.class);
 		EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
 		PaymentIntent paymentIntent = mock(PaymentIntent.class);
 
+		when(event.getId()).thenReturn(eventId);
 		when(event.getType()).thenReturn("payment_intent.succeeded");
 		when(event.getDataObjectDeserializer()).thenReturn(deserializer);
 		when(deserializer.getObject()).thenReturn(java.util.Optional.of(paymentIntent));
 		when(paymentIntent.getMetadata()).thenReturn(Map.of("orderId", orderId));
+		when(paymentIntent.getAmountReceived()).thenReturn(amountReceived);
+		when(paymentIntent.getCurrency()).thenReturn(currency);
+		when(paymentIntent.getId()).thenReturn(paymentIntentId);
+
+		return event;
+	}
+
+	private Event succeededEventWithoutOrderIdMetadata(
+			String eventId,
+			String paymentIntentId,
+			long amountReceived,
+			String currency) {
+		Event event = mock(Event.class);
+		EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
+		PaymentIntent paymentIntent = mock(PaymentIntent.class);
+
+		when(event.getId()).thenReturn(eventId);
+		when(event.getType()).thenReturn("payment_intent.succeeded");
+		when(event.getDataObjectDeserializer()).thenReturn(deserializer);
+		when(deserializer.getObject()).thenReturn(java.util.Optional.of(paymentIntent));
+		when(paymentIntent.getMetadata()).thenReturn(Map.of());
 		when(paymentIntent.getAmountReceived()).thenReturn(amountReceived);
 		when(paymentIntent.getCurrency()).thenReturn(currency);
 		when(paymentIntent.getId()).thenReturn(paymentIntentId);
