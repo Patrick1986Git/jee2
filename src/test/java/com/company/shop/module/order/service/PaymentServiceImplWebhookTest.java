@@ -105,7 +105,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldIgnoreFailedEventWhenDeserializerObjectMissing() {
-        Event event = failedEvent("evt_failed_missing_intent", null);
+        Event event = event("evt_failed_missing_intent", "payment_intent.payment_failed");
         EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
         when(event.getDataObjectDeserializer()).thenReturn(deserializer);
         when(deserializer.getObject()).thenReturn(Optional.empty());
