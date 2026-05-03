@@ -3,7 +3,6 @@ package com.company.shop.module.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -17,11 +16,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,13 +31,11 @@ import com.company.shop.module.order.entity.OrderItem;
 import com.company.shop.module.order.entity.OrderStatus;
 import com.company.shop.module.order.entity.Payment;
 import com.company.shop.module.order.entity.PaymentStatus;
-import com.company.shop.module.order.entity.StripeWebhookEvent;
 import com.company.shop.module.order.exception.OrderNotFoundException;
 import com.company.shop.module.order.exception.WebhookProcessingException;
 import com.company.shop.module.order.exception.WebhookSignatureInvalidException;
 import com.company.shop.module.order.repository.OrderRepository;
 import com.company.shop.module.order.repository.PaymentRepository;
-import com.company.shop.module.order.repository.StripeWebhookEventRepository;
 import com.company.shop.module.product.entity.Product;
 import com.company.shop.module.user.entity.User;
 import com.stripe.exception.SignatureVerificationException;
@@ -62,18 +57,19 @@ class PaymentServiceImplWebhookTest {
     private CartService cartService;
 
     @Mock
-    private StripeWebhookEventRepository stripeWebhookEventRepository;
+    private StripeWebhookEventRegistrar stripeWebhookEventRegistrar;
 
     private PaymentServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new PaymentServiceImpl(orderRepository, paymentRepository, cartService, stripeWebhookEventRepository);
+        service = new PaymentServiceImpl(orderRepository, paymentRepository, cartService, stripeWebhookEventRegistrar);
         setField(service, "webhookSecret", "whsec_test_123");
     }
 
     @Test
     void handleWebhook_shouldIgnoreWhenEventTypeIsNotPaymentIntentSucceeded() {
+        givenWebhookEventRegistrationSucceeds();
         Event event = event("evt_unsupported", "payment_intent.processing");
 
         try (MockedStatic<Webhook> webhookStatic = mockStatic(Webhook.class)) {
@@ -88,6 +84,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldIgnoreWhenDeserializedPaymentIntentIsMissing() {
+        givenWebhookEventRegistrationSucceeds();
         Event event = event("evt_missing_intent", "payment_intent.succeeded");
         EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
         when(event.getDataObjectDeserializer()).thenReturn(deserializer);
@@ -105,6 +102,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldIgnoreFailedEventWhenDeserializerObjectMissing() {
+        givenWebhookEventRegistrationSucceeds();
         Event event = event("evt_failed_missing_intent", "payment_intent.payment_failed");
         EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
         when(event.getDataObjectDeserializer()).thenReturn(deserializer);
@@ -122,6 +120,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldRegisterSupportedEventBeforeBusinessValidationFailure() {
+        givenWebhookEventRegistrationSucceeds();
         Event event = event("evt_missing_order_id", "payment_intent.succeeded");
         EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
         PaymentIntent intent = mock(PaymentIntent.class);
@@ -144,6 +143,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldRegisterFailedEventBeforeBusinessValidationFailure() {
+        givenWebhookEventRegistrationSucceeds();
         Event event = failedEvent("evt_failed_missing_order_id", paymentIntentWithEmptyMetadata());
 
         try (MockedStatic<Webhook> webhookStatic = mockStatic(Webhook.class)) {
@@ -160,6 +160,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldThrowWhenOrderIdMetadataIsNotValidUuid() {
+        givenWebhookEventRegistrationSucceeds();
         Event event = event("evt_invalid_uuid", "payment_intent.succeeded");
         EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
         PaymentIntent intent = mock(PaymentIntent.class);
@@ -181,6 +182,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldThrowWhenPaymentIntentMetadataIsNull() {
+        givenWebhookEventRegistrationSucceeds();
         Event event = event("evt_null_metadata", "payment_intent.succeeded");
         EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
         PaymentIntent intent = mock(PaymentIntent.class);
@@ -212,7 +214,7 @@ class PaymentServiceImplWebhookTest {
                     .isInstanceOf(WebhookSignatureInvalidException.class)
                     .hasMessageContaining("event id");
 
-            verifyNoInteractions(stripeWebhookEventRepository, orderRepository, paymentRepository, cartService);
+            verifyNoInteractions(stripeWebhookEventRegistrar, orderRepository, paymentRepository, cartService);
         }
     }
 
@@ -227,7 +229,7 @@ class PaymentServiceImplWebhookTest {
                     .isInstanceOf(WebhookSignatureInvalidException.class)
                     .hasMessageContaining("event id");
 
-            verifyNoInteractions(stripeWebhookEventRepository, orderRepository, paymentRepository, cartService);
+            verifyNoInteractions(stripeWebhookEventRegistrar, orderRepository, paymentRepository, cartService);
         }
     }
 
@@ -242,7 +244,7 @@ class PaymentServiceImplWebhookTest {
                     .isInstanceOf(WebhookSignatureInvalidException.class)
                     .hasMessageContaining("event type");
 
-            verifyNoInteractions(stripeWebhookEventRepository, orderRepository, paymentRepository, cartService);
+            verifyNoInteractions(stripeWebhookEventRegistrar, orderRepository, paymentRepository, cartService);
         }
     }
 
@@ -257,7 +259,7 @@ class PaymentServiceImplWebhookTest {
                     .isInstanceOf(WebhookSignatureInvalidException.class)
                     .hasMessageContaining("event type");
 
-            verifyNoInteractions(stripeWebhookEventRepository, orderRepository, paymentRepository, cartService);
+            verifyNoInteractions(stripeWebhookEventRegistrar, orderRepository, paymentRepository, cartService);
         }
     }
 
@@ -270,24 +272,21 @@ class PaymentServiceImplWebhookTest {
             assertThatThrownBy(() -> service.handleWebhook("payload", "sig"))
                     .isInstanceOf(WebhookSignatureInvalidException.class);
 
-            verifyNoInteractions(stripeWebhookEventRepository, orderRepository, paymentRepository, cartService);
+            verifyNoInteractions(stripeWebhookEventRegistrar, orderRepository, paymentRepository, cartService);
         }
     }
 
     @Test
     void handleWebhook_shouldIgnoreWhenWebhookEventAlreadyProcessed() {
         Event event = event("evt_duplicate", "payment_intent.succeeded");
-        ConstraintViolationException cve = new ConstraintViolationException("duplicate", null,
-                "uq_stripe_webhook_events_stripe_event_id");
-        doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate", cve))
-                .when(stripeWebhookEventRepository).saveAndFlush(any(StripeWebhookEvent.class));
+        when(stripeWebhookEventRegistrar.register("evt_duplicate", "payment_intent.succeeded")).thenReturn(false);
 
         try (MockedStatic<Webhook> webhookStatic = mockStatic(Webhook.class)) {
             webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_test_123")).thenReturn(event);
 
             service.handleWebhook("payload", "sig");
 
-            verify(stripeWebhookEventRepository).saveAndFlush(any(StripeWebhookEvent.class));
+            verify(stripeWebhookEventRegistrar).register("evt_duplicate", "payment_intent.succeeded");
             verifyNoInteractions(orderRepository, paymentRepository, cartService);
         }
     }
@@ -295,41 +294,22 @@ class PaymentServiceImplWebhookTest {
     @Test
     void handleWebhook_shouldIgnoreDuplicatePaymentFailedWebhookEvent() {
         Event event = event("evt_failed_duplicate", "payment_intent.payment_failed");
-        ConstraintViolationException cve = new ConstraintViolationException("duplicate", null,
-                "uq_stripe_webhook_events_stripe_event_id");
-        doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate", cve))
-                .when(stripeWebhookEventRepository).saveAndFlush(any(StripeWebhookEvent.class));
+        when(stripeWebhookEventRegistrar.register("evt_failed_duplicate", "payment_intent.payment_failed"))
+                .thenReturn(false);
 
         try (MockedStatic<Webhook> webhookStatic = mockStatic(Webhook.class)) {
             webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_test_123")).thenReturn(event);
 
             service.handleWebhook("payload", "sig");
 
-            verify(stripeWebhookEventRepository).saveAndFlush(any(StripeWebhookEvent.class));
-            verifyNoInteractions(orderRepository, paymentRepository, cartService);
-        }
-    }
-
-    @Test
-    void handleWebhook_shouldThrowWhenWebhookEventInsertFailsWithUnknownConstraint() {
-        Event event = event("evt_unknown_constraint", "payment_intent.succeeded");
-        ConstraintViolationException cve = new ConstraintViolationException("unknown", null, "another_constraint");
-        doThrow(new org.springframework.dao.DataIntegrityViolationException("db error", cve))
-                .when(stripeWebhookEventRepository).saveAndFlush(any(StripeWebhookEvent.class));
-
-        try (MockedStatic<Webhook> webhookStatic = mockStatic(Webhook.class)) {
-            webhookStatic.when(() -> Webhook.constructEvent("payload", "sig", "whsec_test_123")).thenReturn(event);
-
-            assertThatThrownBy(() -> service.handleWebhook("payload", "sig"))
-                    .isInstanceOf(WebhookProcessingException.class);
-
-            verify(stripeWebhookEventRepository).saveAndFlush(any(StripeWebhookEvent.class));
+            verify(stripeWebhookEventRegistrar).register("evt_failed_duplicate", "payment_intent.payment_failed");
             verifyNoInteractions(orderRepository, paymentRepository, cartService);
         }
     }
 
     @Test
     void handleWebhook_shouldIgnoreDuplicateWhenOrderAlreadyPaid() {
+        givenWebhookEventRegistrationSucceeds();
         Order paidOrder = orderWithTotal(BigDecimal.valueOf(25));
         paidOrder.markAsPaid();
         Event event = succeededEvent("evt_already_paid", paymentIntentWithMetadata(paidOrder.getId()));
@@ -350,6 +330,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldThrowWhenOrderNotFoundForWebhookOrderId() {
+        givenWebhookEventRegistrationSucceeds();
         UUID orderId = UUID.randomUUID();
         Event event = succeededEvent("evt_order_not_found", paymentIntentWithMetadata(orderId));
 
@@ -370,6 +351,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldThrowWhenPaymentRecordMissing() {
+        givenWebhookEventRegistrationSucceeds();
         Order order = orderWithTotal(BigDecimal.valueOf(19.99));
         Event event = succeededEvent("evt_payment_missing",
                 paymentIntentWithMetadataAndAmountReceivedAndCurrency(order.getId(), 1999L, "pln"));
@@ -395,6 +377,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldThrowWhenStoredProviderPaymentIdDiffersFromWebhookIntentId() {
+        givenWebhookEventRegistrationSucceeds();
         Order order = orderWithTotal(BigDecimal.valueOf(25));
         Payment payment = new Payment(order, "STRIPE", order.getTotalAmount());
         payment.attachProviderPayment("pi_other", "cs_any");
@@ -424,6 +407,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldThrowWhenFailedEventProviderPaymentIdDiffers() {
+        givenWebhookEventRegistrationSucceeds();
         Order order = orderWithTotal(BigDecimal.valueOf(25));
         Payment payment = new Payment(order, "STRIPE", order.getTotalAmount());
         payment.attachProviderPayment("pi_existing", "cs_any");
@@ -451,6 +435,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldMarkPaymentFailedWhenPaymentIntentFailedEventValid() {
+        givenWebhookEventRegistrationSucceeds();
         Order order = orderWithTotal(BigDecimal.valueOf(19.99));
         Payment payment = new Payment(order, "STRIPE", order.getTotalAmount());
         Event event = failedEvent("evt_payment_failed", paymentIntentWithMetadata(order.getId()));
@@ -475,6 +460,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldNotMarkCompletedPaymentAsFailedWhenPaymentIntentFailedArrivesLate() {
+        givenWebhookEventRegistrationSucceeds();
         Order order = orderWithTotal(BigDecimal.valueOf(19.99));
         Payment payment = new Payment(order, "STRIPE", order.getTotalAmount());
         payment.markAsCompleted();
@@ -499,6 +485,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldThrowWhenAmountDoesNotMatchOrderTotal() {
+        givenWebhookEventRegistrationSucceeds();
         Order order = orderWithTotal(BigDecimal.valueOf(19.99));
         Event event = succeededEvent("evt_amount_mismatch",
                 paymentIntentWithMetadataAndAmountReceived(order.getId(), 1500L));
@@ -520,6 +507,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldThrowWhenCurrencyIsNotPln() {
+        givenWebhookEventRegistrationSucceeds();
         Order order = orderWithTotal(BigDecimal.valueOf(19.99));
         Event event = succeededEvent("evt_currency_mismatch",
                 paymentIntentWithMetadataAndAmountReceivedAndCurrency(order.getId(), 1999L, "eur"));
@@ -541,6 +529,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldWrapUnexpectedExceptionIntoWebhookProcessingException() {
+        givenWebhookEventRegistrationSucceeds();
         Order order = orderWithTotal(BigDecimal.valueOf(19.99));
         Payment payment = new Payment(order, "STRIPE", order.getTotalAmount());
         payment.attachProviderPayment("pi_123", "cs_123");
@@ -568,6 +557,7 @@ class PaymentServiceImplWebhookTest {
 
     @Test
     void handleWebhook_shouldMarkOrderPaidPaymentCompletedAndClearCartWhenSucceededEventValid() {
+        givenWebhookEventRegistrationSucceeds();
         Order order = orderWithTotal(BigDecimal.valueOf(19.99));
         Payment payment = new Payment(order, "STRIPE", order.getTotalAmount());
         payment.attachProviderPayment("pi_123", "cs_123");
@@ -593,14 +583,12 @@ class PaymentServiceImplWebhookTest {
         }
     }
 
-    private void verifyWebhookEventRegistered(String expectedEventId, String expectedEventType) {
-        ArgumentCaptor<StripeWebhookEvent> captor = ArgumentCaptor.forClass(StripeWebhookEvent.class);
-        verify(stripeWebhookEventRepository).saveAndFlush(captor.capture());
+    private void givenWebhookEventRegistrationSucceeds() {
+        when(stripeWebhookEventRegistrar.register(any(), any())).thenReturn(true);
+    }
 
-        StripeWebhookEvent savedEvent = captor.getValue();
-        assertThat(savedEvent.getStripeEventId()).isEqualTo(expectedEventId);
-        assertThat(savedEvent.getEventType()).isEqualTo(expectedEventType);
-        assertThat(savedEvent.getProcessedAt()).isNotNull();
+    private void verifyWebhookEventRegistered(String expectedEventId, String expectedEventType) {
+        verify(stripeWebhookEventRegistrar).register(expectedEventId, expectedEventType);
     }
 
     private Event event(String eventId, String eventType) {
