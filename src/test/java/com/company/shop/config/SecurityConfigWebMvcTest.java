@@ -131,7 +131,6 @@ class SecurityConfigWebMvcTest {
                 new ProductReviewResponseDTO(UUID.randomUUID(), "tester", 5, "ok", LocalDateTime.now()));
     }
 
-
     @ParameterizedTest
     @MethodSource("publicGetEndpoints")
     void publicGetEndpoints_shouldBeAccessibleForAnonymous(String endpoint) throws Exception {
@@ -216,7 +215,6 @@ class SecurityConfigWebMvcTest {
                 .andExpect(status().isOk());
     }
 
-
     @Test
     void corsPreflight_shouldAllowXRequestIdHeader() throws Exception {
         mockMvc.perform(options("/api/v1/products")
@@ -234,7 +232,6 @@ class SecurityConfigWebMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Expose-Headers", containsString("X-Request-Id")));
     }
-
 
     @Test
     void publicEndpoint_shouldContainCoreSecurityHeaders() throws Exception {
@@ -366,7 +363,6 @@ class SecurityConfigWebMvcTest {
                 .andExpect(status().isBadRequest());
     }
 
-
     @Test
     void adminProductCreate_shouldDenyUserRole_evenWithCsrf() throws Exception {
         mockMvc.perform(post("/api/v1/admin/products")
@@ -377,7 +373,6 @@ class SecurityConfigWebMvcTest {
                 .andExpect(status().isForbidden());
     }
 
-
     @Test
     void adminProductCreate_shouldDenyAnonymous_evenWithCsrf() throws Exception {
         mockMvc.perform(post("/api/v1/admin/products")
@@ -386,7 +381,6 @@ class SecurityConfigWebMvcTest {
                         .content("{}"))
                 .andExpect(status().isForbidden());
     }
-
 
     @Test
     void adminCategoryUpdate_shouldEnforceRoleAndCsrf() throws Exception {
