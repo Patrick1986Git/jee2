@@ -31,7 +31,7 @@ import com.company.shop.security.jwt.JwtTokenProvider;
         classes = ActuatorSecurityTest.TestApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
         properties = {
-                "management.endpoints.web.exposure.include=health,info,metrics",
+                "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
                 "management.endpoint.health.show-details=when_authorized",
                 "spring.autoconfigure.exclude="
                         + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
@@ -63,21 +63,21 @@ class ActuatorSecurityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "/actuator/info", "/actuator/metrics" })
+    @ValueSource(strings = { "/actuator/info", "/actuator/metrics", "/actuator/prometheus" })
     void actuatorPrivilegedEndpoints_shouldDenyAnonymous(String endpoint) throws Exception {
         mockMvc.perform(get(endpoint))
                 .andExpect(status().isForbidden());
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "/actuator/info", "/actuator/metrics" })
+    @ValueSource(strings = { "/actuator/info", "/actuator/metrics", "/actuator/prometheus" })
     void actuatorPrivilegedEndpoints_shouldDenyRoleUser(String endpoint) throws Exception {
         mockMvc.perform(get(endpoint).with(user("user").roles("USER")))
                 .andExpect(status().isForbidden());
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "/actuator/info", "/actuator/metrics" })
+    @ValueSource(strings = { "/actuator/info", "/actuator/metrics", "/actuator/prometheus" })
     void actuatorPrivilegedEndpoints_shouldAllowRoleAdmin(String endpoint) throws Exception {
         mockMvc.perform(get(endpoint).with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk());

@@ -54,7 +54,7 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(EndpointRequest.to("health")).permitAll()
-                .requestMatchers(EndpointRequest.to("info", "metrics")).hasRole("ADMIN")
+                .requestMatchers(EndpointRequest.to("info", "metrics", "prometheus")).hasRole("ADMIN")
                 .requestMatchers(WEBHOOKS_URL).permitAll()
                 .requestMatchers(SecurityConstants.PUBLIC_ENDPOINTS).permitAll()
                 .requestMatchers(HttpMethod.GET,
