@@ -20,8 +20,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
@@ -31,8 +31,10 @@ import com.company.shop.security.jwt.JwtTokenProvider;
         classes = ActuatorSecurityTest.TestApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
         properties = {
-                "management.endpoints.web.exposure.include=health,info,metrics",
+                "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
                 "management.endpoint.health.show-details=when_authorized",
+                "management.endpoint.prometheus.enabled=true",
+                "management.prometheus.metrics.export.enabled=true",
                 "spring.autoconfigure.exclude="
                         + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
                         + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,"
@@ -63,21 +65,21 @@ class ActuatorSecurityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "/actuator/info", "/actuator/metrics" })
+    @ValueSource(strings = { "/actuator/info", "/actuator/metrics", "/actuator/prometheus" })
     void actuatorPrivilegedEndpoints_shouldDenyAnonymous(String endpoint) throws Exception {
         mockMvc.perform(get(endpoint))
                 .andExpect(status().isForbidden());
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "/actuator/info", "/actuator/metrics" })
+    @ValueSource(strings = { "/actuator/info", "/actuator/metrics", "/actuator/prometheus" })
     void actuatorPrivilegedEndpoints_shouldDenyRoleUser(String endpoint) throws Exception {
         mockMvc.perform(get(endpoint).with(user("user").roles("USER")))
                 .andExpect(status().isForbidden());
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "/actuator/info", "/actuator/metrics" })
+    @ValueSource(strings = { "/actuator/info", "/actuator/metrics", "/actuator/prometheus" })
     void actuatorPrivilegedEndpoints_shouldAllowRoleAdmin(String endpoint) throws Exception {
         mockMvc.perform(get(endpoint).with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk());
@@ -89,8 +91,9 @@ class ActuatorSecurityTest {
     static class TestApplication {
 
         @Bean
-        MeterRegistry meterRegistry() {
-            return new SimpleMeterRegistry();
+        PrometheusMeterRegistry prometheusMeterRegistry() {
+            return new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
         }
+
     }
 }

@@ -29,11 +29,13 @@ The baseline exposes only:
 - `/actuator/health`
 - `/actuator/info`
 - `/actuator/metrics`
+- `/actuator/prometheus`
 
 ### Access model
 - `/actuator/health` — public (`permitAll`),
 - `/actuator/info` — only `ROLE_ADMIN`,
-- `/actuator/metrics` — only `ROLE_ADMIN`.
+- `/actuator/metrics` — only `ROLE_ADMIN` (manual metric exploration).
+- `/actuator/prometheus` — only `ROLE_ADMIN` (Prometheus scraping endpoint).
 
 Health details are configured with `show-details: when_authorized`.
 
@@ -50,6 +52,7 @@ Without token (anonymous):
 curl -i http://localhost:8080/actuator/health
 curl -i http://localhost:8080/actuator/info
 curl -i http://localhost:8080/actuator/metrics
+curl -i http://localhost:8080/actuator/prometheus
 ```
 
 With admin JWT:
@@ -57,6 +60,7 @@ With admin JWT:
 ```bash
 curl -i -H "Authorization: Bearer <ADMIN_JWT>" http://localhost:8080/actuator/info
 curl -i -H "Authorization: Bearer <ADMIN_JWT>" http://localhost:8080/actuator/metrics
+curl -i -H "Authorization: Bearer <ADMIN_JWT>" http://localhost:8080/actuator/prometheus
 ```
 
 Request id visibility:
@@ -68,7 +72,6 @@ curl -i -H "X-Request-Id: demo-123" http://localhost:8080/api/v1/products
 ## 4) Out of scope for current baseline (intentional)
 
 At this stage we intentionally do **not** add:
-- Prometheus registry,
 - Grafana dashboards,
 - deployment/infrastructure changes,
 - Docker build/publish changes.
@@ -84,7 +87,7 @@ The first low-risk business counters are now exposed through Spring Boot Actuato
 - `shop.webhook.total` with `result=received|processed|duplicate|failed|ignored`,
 - `shop.business_exception.total` with `error_code=<stable BusinessException error code>` and `status_class=4xx|5xx|other`.
 
-These metrics are available under `/actuator/metrics` (admin-only access as defined above), with bounded low-cardinality tags only.  
+These metrics are available under `/actuator/metrics` (admin-only access as defined above, intended for manual inspection), with bounded low-cardinality tags only. Prometheus should scrape `/actuator/prometheus` (also admin-only).  
 For webhook and business-exception metrics we intentionally do not add high-cardinality tags (for example `requestId`, `userId`, `orderId`, `email`, `paymentId`, Stripe intent id, or raw exception message).
 
 ## 6) Future metrics (preparatory audit)
@@ -145,7 +148,6 @@ When adding meters in a next step, keep tags bounded and low-cardinality:
 
 ### What we intentionally do NOT add in this preparatory stage
 
-- no Prometheus registry,
 - no Grafana or dashboards,
 - no deployment/CI/container changes,
 - no endpoint contract changes,
