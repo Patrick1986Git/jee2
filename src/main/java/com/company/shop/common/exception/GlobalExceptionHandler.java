@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -44,6 +46,17 @@ import jakarta.validation.ConstraintViolationException;
 public class GlobalExceptionHandler {
 
 	private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+	private static final String BUSINESS_EXCEPTION_METRIC = "shop.business_exception.total";
+	private static final String ERROR_CODE_TAG = "error_code";
+	private static final String STATUS_CLASS_TAG = "status_class";
+	private static final String UNKNOWN_BUSINESS_ERROR = "UNKNOWN_BUSINESS_ERROR";
+
+	private final MeterRegistry meterRegistry;
+
+	public GlobalExceptionHandler(MeterRegistry meterRegistry) {
+		this.meterRegistry = meterRegistry;
+	}
 
 	/**
 	 * Handles validation failures for {@code @Valid} annotated parameters.
@@ -81,7 +94,7 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<ApiError> handleBusinessException(BusinessException ex) {
 
-		String errorCode = ex.getErrorCode() != null ? ex.getErrorCode() : "UNKNOWN_BUSINESS_ERROR";
+		String errorCode = ex.getErrorCode() != null ? ex.getErrorCode() : UNKNOWN_BUSINESS_ERROR;
 		if (ex.getStatus().is5xxServerError()) {
 			log.error("Business invariant/server exception occurred [{}] status={} type={}",
 				errorCode,
@@ -94,6 +107,8 @@ public class GlobalExceptionHandler {
 				ex.getStatus().value(),
 				ex.getClass().getSimpleName());
 		}
+
+		incrementBusinessExceptionMetric(errorCode, ex.getStatus());
 
 		ApiError apiError = new ApiError(ex.getStatus().value(), ex.getMessage(), errorCode);
 
@@ -221,6 +236,23 @@ public class GlobalExceptionHandler {
 				"ENDPOINT_NOT_FOUND");
 
 		return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+	}
+
+	private void incrementBusinessExceptionMetric(String errorCode, HttpStatus status) {
+		meterRegistry.counter(BUSINESS_EXCEPTION_METRIC,
+				ERROR_CODE_TAG, errorCode,
+				STATUS_CLASS_TAG, mapStatusClass(status))
+				.increment();
+	}
+
+	private String mapStatusClass(HttpStatus status) {
+		if (status.is4xxClientError()) {
+			return "4xx";
+		}
+		if (status.is5xxServerError()) {
+			return "5xx";
+		}
+		return "other";
 	}
 
 	private Throwable findCause(Throwable throwable, Class<?>... types) {

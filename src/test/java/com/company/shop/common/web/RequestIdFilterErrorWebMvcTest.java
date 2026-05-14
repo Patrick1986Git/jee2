@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -19,6 +20,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import io.micrometer.core.instrument.MeterRegistry;
 
 import com.company.shop.common.exception.BusinessException;
 import com.company.shop.common.exception.GlobalExceptionHandler;
@@ -34,6 +37,9 @@ class RequestIdFilterErrorWebMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+	@MockBean
+	private MeterRegistry meterRegistry;
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;

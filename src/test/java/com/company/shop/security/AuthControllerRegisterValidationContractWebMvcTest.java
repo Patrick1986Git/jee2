@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import org.springframework.context.annotation.ComponentScan;
@@ -21,6 +22,8 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
+import io.micrometer.core.instrument.MeterRegistry;
 
 import com.company.shop.common.exception.GlobalExceptionHandler;
 import com.company.shop.module.user.dto.RegisterRequestDTO;
@@ -34,6 +37,9 @@ class AuthControllerRegisterValidationContractWebMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+	@MockBean
+	private MeterRegistry meterRegistry;
 
     @Autowired
     private ObjectMapper objectMapper;
