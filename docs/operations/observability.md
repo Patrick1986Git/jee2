@@ -81,10 +81,11 @@ The first low-risk business counters are now exposed through Spring Boot Actuato
 
 - `shop.checkout.total` with `result=attempt|success|failure`,
 - `shop.payment_intent.total` with `result=created|reused|failed`,
-- `shop.webhook.total` with `result=received|processed|duplicate|failed|ignored`.
+- `shop.webhook.total` with `result=received|processed|duplicate|failed|ignored`,
+- `shop.business_exception.total` with `error_code=<stable BusinessException error code>` and `status_class=4xx|5xx|other`.
 
 These metrics are available under `/actuator/metrics` (admin-only access as defined above), with bounded low-cardinality tags only.  
-For webhook metrics we intentionally do not add high-cardinality tags (for example `eventId`, `orderId`, `userId`, `paymentId`, Stripe intent id, or raw exception message).
+For webhook and business-exception metrics we intentionally do not add high-cardinality tags (for example `requestId`, `userId`, `orderId`, `email`, `paymentId`, Stripe intent id, or raw exception message).
 
 ## 6) Future metrics (preparatory audit)
 

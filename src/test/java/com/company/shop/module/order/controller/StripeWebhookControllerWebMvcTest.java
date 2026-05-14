@@ -30,6 +30,7 @@ import com.company.shop.module.order.exception.WebhookProcessingException;
 import com.company.shop.module.order.exception.WebhookSignatureInvalidException;
 import com.company.shop.module.order.service.PaymentService;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
+import com.company.shop.support.TestMeterRegistryConfig;
 
 @WebMvcTest(
 		controllers = StripeWebhookController.class,
@@ -37,7 +38,7 @@ import com.company.shop.security.jwt.JwtAuthenticationFilter;
 )
 @ActiveProfiles("test")
 @AutoConfigureMockMvc(addFilters = false)
-@Import(GlobalExceptionHandler.class)
+@Import({ GlobalExceptionHandler.class, TestMeterRegistryConfig.class })
 class StripeWebhookControllerWebMvcTest {
 
 	private static final String WEBHOOK_URL = "/api/v1/webhooks/stripe";

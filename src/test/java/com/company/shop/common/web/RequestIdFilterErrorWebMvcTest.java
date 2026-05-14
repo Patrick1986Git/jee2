@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -26,10 +27,11 @@ import com.company.shop.config.SecurityConfig;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.company.shop.support.TestMeterRegistryConfig;
 
 @WebMvcTest(controllers = RequestIdFilterErrorWebMvcTest.TestErrorController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, RequestIdFilter.class, GlobalExceptionHandler.class,
-        RequestIdFilterErrorWebMvcTest.TestErrorController.class })
+        RequestIdFilterErrorWebMvcTest.TestErrorController.class, TestMeterRegistryConfig.class })
 class RequestIdFilterErrorWebMvcTest {
 
     @Autowired

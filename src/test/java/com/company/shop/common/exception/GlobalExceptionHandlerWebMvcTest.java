@@ -3,6 +3,7 @@ package com.company.shop.common.exception;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,13 +14,14 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
@@ -34,6 +36,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
+import com.company.shop.support.TestMeterRegistryConfig;
+
+import io.micrometer.core.instrument.MeterRegistry;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -64,13 +69,21 @@ import jakarta.validation.constraints.NotBlank;
  */
 @WebMvcTest(controllers = GlobalExceptionHandlerWebMvcTest.TestExceptionController.class, excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class))
 @AutoConfigureMockMvc(addFilters = false)
-@Import({ GlobalExceptionHandler.class, GlobalExceptionHandlerWebMvcTest.TestExceptionController.class })
+@Import({ GlobalExceptionHandler.class, GlobalExceptionHandlerWebMvcTest.TestExceptionController.class, TestMeterRegistryConfig.class })
 class GlobalExceptionHandlerWebMvcTest {
 
 	private static final String TIMESTAMP_REGEX = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?$";
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	@Autowired
+	private MeterRegistry meterRegistry;
+
+	@BeforeEach
+	void resetMetrics() {
+		meterRegistry.clear();
+	}
 
 	@Test
 	void validationException_shouldReturnApiErrorContract() throws Exception {
@@ -106,6 +119,8 @@ class GlobalExceptionHandlerWebMvcTest {
 				.andExpect(jsonPath("$.errorCode").value("BUSINESS_NOT_FOUND"))
 				.andExpect(jsonPath("$.errors").value(nullValue()))
 				.andExpect(jsonPath("$.timestamp", matchesPattern(TIMESTAMP_REGEX)));
+
+		assertBusinessExceptionMetric("BUSINESS_NOT_FOUND", "4xx", 1.0d);
 	}
 
 	@Test
@@ -116,6 +131,21 @@ class GlobalExceptionHandlerWebMvcTest {
 				.andExpect(jsonPath("$.errorCode").value("UNKNOWN_BUSINESS_ERROR"))
 				.andExpect(jsonPath("$.errors").value(nullValue()))
 				.andExpect(jsonPath("$.timestamp", matchesPattern(TIMESTAMP_REGEX)));
+
+		assertBusinessExceptionMetric("UNKNOWN_BUSINESS_ERROR", "4xx", 1.0d);
+	}
+
+
+	@Test
+	void businessException5xx_shouldReturnApiErrorContractAndIncrementMetric() throws Exception {
+		mockMvc.perform(get("/test-exceptions/business-server-error")).andExpect(status().isInternalServerError())
+				.andExpect(jsonPath("$.status").value(500))
+				.andExpect(jsonPath("$.message").value("Business server error"))
+				.andExpect(jsonPath("$.errorCode").value("BUSINESS_SERVER_ERROR"))
+				.andExpect(jsonPath("$.errors").value(nullValue()))
+				.andExpect(jsonPath("$.timestamp", matchesPattern(TIMESTAMP_REGEX)));
+
+		assertBusinessExceptionMetric("BUSINESS_SERVER_ERROR", "5xx", 1.0d);
 	}
 
 	@Test
@@ -198,6 +228,15 @@ class GlobalExceptionHandlerWebMvcTest {
 				.andExpect(jsonPath("$.timestamp", matchesPattern(TIMESTAMP_REGEX)));
 	}
 
+	private void assertBusinessExceptionMetric(String errorCode, String statusClass, double expectedCount) {
+		double counter = meterRegistry
+				.get("shop.business_exception.total")
+				.tags("error_code", errorCode, "status_class", statusClass)
+				.counter()
+				.count();
+		assertThat(counter).isEqualTo(expectedCount);
+	}
+
 	@RestController
 	@RequestMapping("/test-exceptions")
 	@Validated
@@ -215,6 +254,11 @@ class GlobalExceptionHandlerWebMvcTest {
 		@GetMapping("/business-without-code")
 		void businessWithoutCode() {
 			throw new TestBusinessExceptionWithoutErrorCode(HttpStatus.BAD_REQUEST, "Business validation failed");
+		}
+
+		@GetMapping("/business-server-error")
+		void businessServerError() {
+			throw new TestBusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "Business server error", "BUSINESS_SERVER_ERROR");
 		}
 
 		@GetMapping("/type-mismatch")
