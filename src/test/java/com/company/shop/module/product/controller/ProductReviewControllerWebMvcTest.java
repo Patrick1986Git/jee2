@@ -40,8 +40,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import io.micrometer.core.instrument.MeterRegistry;
-
 import com.company.shop.common.exception.GlobalExceptionHandler;
 import com.company.shop.config.SecurityConfig;
 import com.company.shop.module.product.dto.ProductReviewRequestDTO;
@@ -54,10 +52,11 @@ import com.company.shop.module.product.service.ProductReviewService;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.company.shop.support.TestMeterRegistryConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @WebMvcTest(controllers = ProductReviewController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class, TestMeterRegistryConfig.class })
 class ProductReviewControllerWebMvcTest {
 
     private static final String REVIEWS_URL = "/api/v1/reviews";
@@ -66,9 +65,6 @@ class ProductReviewControllerWebMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-	@MockBean
-	private MeterRegistry meterRegistry;
 
     @Autowired
     private ObjectMapper objectMapper;

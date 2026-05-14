@@ -34,8 +34,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import io.micrometer.core.instrument.MeterRegistry;
-
 import com.company.shop.common.exception.GlobalExceptionHandler;
 import com.company.shop.config.SecurityConfig;
 import com.company.shop.module.cart.dto.AddToCartRequestDTO;
@@ -48,17 +46,15 @@ import com.company.shop.module.product.exception.ProductNotFoundException;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.company.shop.support.TestMeterRegistryConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @WebMvcTest(controllers = CartController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class, TestMeterRegistryConfig.class })
 class CartControllerWebMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-	@MockBean
-	private MeterRegistry meterRegistry;
 
     @Autowired
     private ObjectMapper objectMapper;

@@ -34,8 +34,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import io.micrometer.core.instrument.MeterRegistry;
-
 import com.company.shop.common.exception.GlobalExceptionHandler;
 import com.company.shop.config.SecurityConfig;
 import com.company.shop.module.product.dto.ProductResponseDTO;
@@ -45,9 +43,10 @@ import com.company.shop.module.product.service.ProductService;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.company.shop.support.TestMeterRegistryConfig;
 
 @WebMvcTest(controllers = ProductController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class, TestMeterRegistryConfig.class })
 class ProductControllerWebMvcTest {
 
     private static final String PRODUCTS_URL = "/api/v1/products";
@@ -57,9 +56,6 @@ class ProductControllerWebMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-	@MockBean
-	private MeterRegistry meterRegistry;
 
     @MockitoBean
     private ProductService productService;

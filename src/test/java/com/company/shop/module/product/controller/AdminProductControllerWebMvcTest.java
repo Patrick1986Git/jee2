@@ -39,8 +39,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import io.micrometer.core.instrument.MeterRegistry;
-
 import com.company.shop.common.exception.GlobalExceptionHandler;
 import com.company.shop.config.SecurityConfig;
 import com.company.shop.module.product.dto.ProductCreateDTO;
@@ -53,10 +51,11 @@ import com.company.shop.module.product.service.ProductService;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.company.shop.support.TestMeterRegistryConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @WebMvcTest(controllers = AdminProductController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class, TestMeterRegistryConfig.class })
 class AdminProductControllerWebMvcTest {
 
     private static final String ADMIN_PRODUCTS_URL = "/api/v1/admin/products";
@@ -64,9 +63,6 @@ class AdminProductControllerWebMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-	@MockBean
-	private MeterRegistry meterRegistry;
 
     @Autowired
     private ObjectMapper objectMapper;

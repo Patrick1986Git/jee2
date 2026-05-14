@@ -26,8 +26,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import io.micrometer.core.instrument.MeterRegistry;
-
 import com.company.shop.common.exception.GlobalExceptionHandler;
 import com.company.shop.config.SecurityConfig;
 import com.company.shop.module.system.dto.ApplicationStatusDTO;
@@ -35,18 +33,16 @@ import com.company.shop.module.system.service.ApplicationStatusService;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.company.shop.support.TestMeterRegistryConfig;
 
 @WebMvcTest(controllers = SystemController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class, TestMeterRegistryConfig.class })
 class SystemControllerWebMvcTest {
 
     private static final String SYSTEM_STATUS_URL = "/api/v1/system/status";
 
     @Autowired
     private MockMvc mockMvc;
-
-	@MockBean
-	private MeterRegistry meterRegistry;
 
     @MockitoBean
     private ApplicationStatusService applicationStatusService;

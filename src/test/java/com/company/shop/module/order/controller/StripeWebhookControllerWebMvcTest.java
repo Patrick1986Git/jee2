@@ -26,8 +26,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import io.micrometer.core.instrument.MeterRegistry;
-
 import com.company.shop.common.exception.GlobalExceptionHandler;
 import com.company.shop.module.order.exception.WebhookProcessingException;
 import com.company.shop.module.order.exception.WebhookSignatureInvalidException;
@@ -40,7 +38,7 @@ import com.company.shop.security.jwt.JwtAuthenticationFilter;
 )
 @ActiveProfiles("test")
 @AutoConfigureMockMvc(addFilters = false)
-@Import(GlobalExceptionHandler.class)
+@Import({ GlobalExceptionHandler.class, TestMeterRegistryConfig.class })
 class StripeWebhookControllerWebMvcTest {
 
 	private static final String WEBHOOK_URL = "/api/v1/webhooks/stripe";
@@ -49,9 +47,6 @@ class StripeWebhookControllerWebMvcTest {
 
 	@Autowired
 	private MockMvc mockMvc;
-
-	@MockBean
-	private MeterRegistry meterRegistry;
 
 	@MockitoBean
 	private PaymentService paymentService;

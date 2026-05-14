@@ -21,25 +21,21 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import io.micrometer.core.instrument.MeterRegistry;
-
 import com.company.shop.common.exception.BusinessException;
 import com.company.shop.common.exception.GlobalExceptionHandler;
 import com.company.shop.config.SecurityConfig;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.company.shop.support.TestMeterRegistryConfig;
 
 @WebMvcTest(controllers = RequestIdFilterErrorWebMvcTest.TestErrorController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, RequestIdFilter.class, GlobalExceptionHandler.class,
-        RequestIdFilterErrorWebMvcTest.TestErrorController.class })
+        RequestIdFilterErrorWebMvcTest.TestErrorController.class, TestMeterRegistryConfig.class })
 class RequestIdFilterErrorWebMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-	@MockBean
-	private MeterRegistry meterRegistry;
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;

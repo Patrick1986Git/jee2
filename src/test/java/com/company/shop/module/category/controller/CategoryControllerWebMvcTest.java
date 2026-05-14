@@ -33,8 +33,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import io.micrometer.core.instrument.MeterRegistry;
-
 import com.company.shop.common.exception.GlobalExceptionHandler;
 import com.company.shop.config.SecurityConfig;
 import com.company.shop.module.category.dto.CategoryResponseDTO;
@@ -43,9 +41,10 @@ import com.company.shop.module.category.service.CategoryService;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtAuthenticationFilter;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.company.shop.support.TestMeterRegistryConfig;
 
 @WebMvcTest(controllers = CategoryController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, GlobalExceptionHandler.class, TestMeterRegistryConfig.class })
 class CategoryControllerWebMvcTest {
 
     private static final String CATEGORIES_URL = "/api/v1/categories";
@@ -53,9 +52,6 @@ class CategoryControllerWebMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-	@MockBean
-	private MeterRegistry meterRegistry;
 
     @MockitoBean
     private CategoryService categoryService;
