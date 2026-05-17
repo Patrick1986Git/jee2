@@ -23,6 +23,15 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.company.shop.module.cart.service.CartService;
+import com.company.shop.module.category.service.CategoryService;
+import com.company.shop.module.order.service.OrderService;
+import com.company.shop.module.order.service.PaymentService;
+import com.company.shop.module.product.service.ProductReviewService;
+import com.company.shop.module.product.service.ProductService;
+import com.company.shop.module.system.service.ApplicationStatusService;
+import com.company.shop.module.user.service.UserService;
+import com.company.shop.security.AuthService;
 import com.company.shop.module.user.repository.RoleRepository;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.jwt.JwtTokenProvider;
@@ -52,6 +61,24 @@ class OpenApiDocsSmokeTest {
 
     @MockitoBean
     private RoleRepository roleRepository;
+    @MockitoBean
+    private AuthService authService;
+    @MockitoBean
+    private ApplicationStatusService applicationStatusService;
+    @MockitoBean
+    private CategoryService categoryService;
+    @MockitoBean
+    private ProductService productService;
+    @MockitoBean
+    private ProductReviewService productReviewService;
+    @MockitoBean
+    private CartService cartService;
+    @MockitoBean
+    private UserService userService;
+    @MockitoBean
+    private OrderService orderService;
+    @MockitoBean
+    private PaymentService paymentService;
 
     @BeforeEach
     void setUp() {
