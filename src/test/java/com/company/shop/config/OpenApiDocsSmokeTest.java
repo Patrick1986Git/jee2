@@ -36,6 +36,7 @@ import com.company.shop.module.user.service.UserService;
 import com.company.shop.security.AuthService;
 import com.company.shop.module.user.repository.RoleRepository;
 import com.company.shop.security.UserDetailsServiceImpl;
+import com.company.shop.security.UserRolesStartupValidator;
 import com.company.shop.security.jwt.JwtTokenProvider;
 
 @SpringBootTest(
@@ -63,6 +64,8 @@ class OpenApiDocsSmokeTest {
 
     @MockitoBean
     private RoleRepository roleRepository;
+    @MockitoBean
+    private UserRolesStartupValidator userRolesStartupValidator;
     @MockitoBean
     private AuthService authService;
     @MockitoBean
