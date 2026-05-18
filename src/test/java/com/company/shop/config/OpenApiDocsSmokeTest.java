@@ -1,8 +1,9 @@
 package com.company.shop.config;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -17,13 +18,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.company.shop.module.cart.service.CartService;
 import com.company.shop.module.category.service.CategoryService;
 import com.company.shop.module.order.service.OrderService;
@@ -32,12 +34,14 @@ import com.company.shop.module.order.service.StripeWebhookEventRegistrar;
 import com.company.shop.module.product.service.ProductReviewService;
 import com.company.shop.module.product.service.ProductService;
 import com.company.shop.module.system.service.ApplicationStatusService;
+import com.company.shop.module.user.repository.RoleRepository;
 import com.company.shop.module.user.service.UserService;
 import com.company.shop.security.AuthService;
-import com.company.shop.module.user.repository.RoleRepository;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.UserRolesStartupValidator;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
@@ -48,46 +52,21 @@ import com.company.shop.security.jwt.JwtTokenProvider;
                         + "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
         }
 )
+@ContextConfiguration(classes = OpenApiDocsSmokeTest.OpenApiDocsSmokeTestConfiguration.class)
 @AutoConfigureMockMvc
 class OpenApiDocsSmokeTest {
+
+    private static final String API_DOCS_ENDPOINT = "/api-docs";
 
     @Autowired
     private MockMvc mockMvc;
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockitoBean
+    @Autowired
     private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private UserDetailsServiceImpl userDetailsService;
-
-    @MockitoBean
+    @Autowired
     private RoleRepository roleRepository;
-    @MockitoBean
-    private UserRolesStartupValidator userRolesStartupValidator;
-    @MockitoBean
-    private AuthService authService;
-    @MockitoBean
-    private ApplicationStatusService applicationStatusService;
-    @MockitoBean
-    private CategoryService categoryService;
-    @MockitoBean
-    private ProductService productService;
-    @MockitoBean
-    private ProductReviewService productReviewService;
-    @MockitoBean
-    private CartService cartService;
-    @MockitoBean
-    private UserService userService;
-    @MockitoBean
-    private OrderService orderService;
-    @MockitoBean
-    private PaymentService paymentService;
-    @MockitoBean
-    private StripeWebhookEventRegistrar stripeWebhookEventRegistrar;
-    @MockitoBean(name = "jpaMappingContext")
-    private JpaMetamodelMappingContext jpaMappingContext;
 
     @BeforeEach
     void setUp() {
@@ -97,7 +76,7 @@ class OpenApiDocsSmokeTest {
 
     @Test
     void openApiDocs_shouldBePublicAndContainCorePaths() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api-docs"))
+        MvcResult result = mockMvc.perform(get(API_DOCS_ENDPOINT))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", containsString("application/json")))
                 .andExpect(jsonPath("$.openapi").isNotEmpty())
@@ -129,5 +108,99 @@ class OpenApiDocsSmokeTest {
         assertThat(pathKeys)
                 .as("Generated OpenAPI path keys: %s", pathKeys)
                 .anyMatch(path -> path.matches("^/api/v1/admin/categories/\\{[^/]+\\}$"));
+    }
+
+    @Configuration
+    static class OpenApiDocsSmokeTestConfiguration {
+
+        @Bean
+        @Primary
+        JwtTokenProvider jwtTokenProvider() {
+            return mock(JwtTokenProvider.class);
+        }
+
+        @Bean
+        @Primary
+        UserDetailsServiceImpl userDetailsService() {
+            return mock(UserDetailsServiceImpl.class);
+        }
+
+        @Bean
+        @Primary
+        RoleRepository roleRepository() {
+            return mock(RoleRepository.class);
+        }
+
+        @Bean
+        @Primary
+        UserRolesStartupValidator userRolesStartupValidator() {
+            return mock(UserRolesStartupValidator.class);
+        }
+
+        @Bean
+        @Primary
+        AuthService authService() {
+            return mock(AuthService.class);
+        }
+
+        @Bean
+        @Primary
+        ApplicationStatusService applicationStatusService() {
+            return mock(ApplicationStatusService.class);
+        }
+
+        @Bean
+        @Primary
+        CategoryService categoryService() {
+            return mock(CategoryService.class);
+        }
+
+        @Bean
+        @Primary
+        ProductService productService() {
+            return mock(ProductService.class);
+        }
+
+        @Bean
+        @Primary
+        ProductReviewService productReviewService() {
+            return mock(ProductReviewService.class);
+        }
+
+        @Bean
+        @Primary
+        CartService cartService() {
+            return mock(CartService.class);
+        }
+
+        @Bean
+        @Primary
+        UserService userService() {
+            return mock(UserService.class);
+        }
+
+        @Bean
+        @Primary
+        OrderService orderService() {
+            return mock(OrderService.class);
+        }
+
+        @Bean
+        @Primary
+        PaymentService paymentService() {
+            return mock(PaymentService.class);
+        }
+
+        @Bean
+        @Primary
+        StripeWebhookEventRegistrar stripeWebhookEventRegistrar() {
+            return mock(StripeWebhookEventRegistrar.class);
+        }
+
+        @Bean(name = "jpaMappingContext")
+        @Primary
+        JpaMetamodelMappingContext jpaMappingContext() {
+            return mock(JpaMetamodelMappingContext.class);
+        }
     }
 }
