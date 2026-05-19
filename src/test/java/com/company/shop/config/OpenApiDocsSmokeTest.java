@@ -1,7 +1,7 @@
 package com.company.shop.config;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -17,13 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.company.shop.module.cart.service.CartService;
 import com.company.shop.module.category.service.CategoryService;
 import com.company.shop.module.order.service.OrderService;
@@ -32,12 +30,14 @@ import com.company.shop.module.order.service.StripeWebhookEventRegistrar;
 import com.company.shop.module.product.service.ProductReviewService;
 import com.company.shop.module.product.service.ProductService;
 import com.company.shop.module.system.service.ApplicationStatusService;
+import com.company.shop.module.user.repository.RoleRepository;
 import com.company.shop.module.user.service.UserService;
 import com.company.shop.security.AuthService;
-import com.company.shop.module.user.repository.RoleRepository;
 import com.company.shop.security.UserDetailsServiceImpl;
 import com.company.shop.security.UserRolesStartupValidator;
 import com.company.shop.security.jwt.JwtTokenProvider;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
@@ -51,42 +51,57 @@ import com.company.shop.security.jwt.JwtTokenProvider;
 @AutoConfigureMockMvc
 class OpenApiDocsSmokeTest {
 
+    private static final String API_DOCS_ENDPOINT = "/api-docs";
+
     @Autowired
     private MockMvc mockMvc;
+
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockitoBean
+    @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
-    @MockitoBean
+    @MockBean
     private UserDetailsServiceImpl userDetailsService;
 
-    @MockitoBean
+    @MockBean
     private RoleRepository roleRepository;
-    @MockitoBean
+
+    @MockBean
     private UserRolesStartupValidator userRolesStartupValidator;
-    @MockitoBean
+
+    @MockBean
     private AuthService authService;
-    @MockitoBean
+
+    @MockBean
     private ApplicationStatusService applicationStatusService;
-    @MockitoBean
+
+    @MockBean
     private CategoryService categoryService;
-    @MockitoBean
+
+    @MockBean
     private ProductService productService;
-    @MockitoBean
+
+    @MockBean
     private ProductReviewService productReviewService;
-    @MockitoBean
+
+    @MockBean
     private CartService cartService;
-    @MockitoBean
+
+    @MockBean
     private UserService userService;
-    @MockitoBean
+
+    @MockBean
     private OrderService orderService;
-    @MockitoBean
+
+    @MockBean
     private PaymentService paymentService;
-    @MockitoBean
+
+    @MockBean
     private StripeWebhookEventRegistrar stripeWebhookEventRegistrar;
-    @MockitoBean(name = "jpaMappingContext")
+
+    @MockBean(name = "jpaMappingContext")
     private JpaMetamodelMappingContext jpaMappingContext;
 
     @BeforeEach
@@ -97,7 +112,7 @@ class OpenApiDocsSmokeTest {
 
     @Test
     void openApiDocs_shouldBePublicAndContainCorePaths() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api-docs"))
+        MvcResult result = mockMvc.perform(get(API_DOCS_ENDPOINT))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", containsString("application/json")))
                 .andExpect(jsonPath("$.openapi").isNotEmpty())
