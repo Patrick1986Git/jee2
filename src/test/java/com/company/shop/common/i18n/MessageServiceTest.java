@@ -5,16 +5,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.context.support.ResourceBundleMessageSource;
 
-@SpringBootTest
 class MessageServiceTest {
 
-    @Autowired
     private MessageService messageService;
+
+    @BeforeEach
+    void setUp() {
+        final ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setBasename("i18n/messages");
+        messageSource.setDefaultEncoding("UTF-8");
+        messageSource.setFallbackToSystemLocale(false);
+        messageService = new MessageService(messageSource);
+    }
 
     @AfterEach
     void tearDown() {
