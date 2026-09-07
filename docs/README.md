@@ -24,6 +24,7 @@ This `docs/` folder contains practical documentation that is currently grounded 
 - [`operations/production-edge.md`](./operations/production-edge.md) — production edge trust boundary and public-authentication abuse controls.
 - [`operations/jwt-key-rotation.md`](./operations/jwt-key-rotation.md) — bounded JWT signing-key rollover, retirement, rollback, and emergency-compromise procedure.
 - [`operations/database.md`](./operations/database.md) — PostgreSQL schema ownership and database conventions.
+- [`operations/data-retention.md`](./operations/data-retention.md) — operational-record retention classes, correctness boundaries, and prerequisites for future purge or archival.
 - [`operations/disaster-recovery.md`](./operations/disaster-recovery.md) — production backup/PITR ownership, logical restore baseline, Flyway and role restoration, and rehearsal evidence.
 - [`operations/container-security.md`](./operations/container-security.md) — Dockerfile linting, image vulnerability scanning, SBOM artifacts, and local reproduction commands.
 - [`operations/migrations.md`](./operations/migrations.md) — Flyway migration sequence and migration rules.
