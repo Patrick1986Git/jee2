@@ -62,7 +62,7 @@ clamp age to zero if the application clock is behind a stored timestamp.
 | `shop.notification.actionable.count` | Gauge | `NotificationDeliveryMetrics` | none | Current due PENDING notifications plus PROCESSING notifications with expired claims. Future deliveries and live claims are excluded. |
 | `shop.notification.actionable.oldest.age.seconds` | Gauge | `NotificationDeliveryMetrics` | none | Time since the oldest matching notification became actionable: due/retry time (or creation) for PENDING, claim expiry for PROCESSING. |
 | `shop.notification.failed.count` | Gauge | `NotificationDeliveryMetrics` | none | Current terminal FAILED notifications requiring operator investigation or requeue. |
-| `shop.notification.failed.oldest.age.seconds` | Gauge | `NotificationDeliveryMetrics` | none | Time since the oldest current failed notification's terminal `last_attempt_at`. |
+| `shop.notification.failed.oldest.last_attempt.age.seconds` | Gauge | `NotificationDeliveryMetrics` | none | Time since `last_attempt_at` for the current FAILED notification with the oldest delivery-attempt timestamp. This is attempt age, not exact time spent in FAILED. |
 
 All tag value sets above are defined by repository code. No tag contains a user, order, payment, provider-event,
 email, JWT subject, request, arbitrary provider value, exception message, payload, or notification content. Tests use a
@@ -89,7 +89,8 @@ This repository owns no production alert manager and defines no numeric SLOs, th
 Deployment owners should select objectives and alert conditions such as:
 
 - actionable outbox or notification age exceeding the selected processing/delivery objective;
-- dead-letter or failed work remaining non-zero beyond the approved investigation window;
+- dead-letter or failed work remaining non-zero beyond the approved investigation window (evaluate persistence of the
+  count over time; notification last-attempt age is not an exact FAILED-state duration);
 - sustained checkout, payment-intent, webhook, reservation-processing, or recovery failure rates exceeding the
   selected error budget.
 
@@ -111,6 +112,13 @@ investigation. Outbox and notification failures persist bounded workflow state a
 inspection but do not currently emit dedicated failure logs. This avoids logging outbox payloads, notification bodies,
 recipients, raw webhook bodies, secrets, or client secrets; metrics provide the proactive signal and protected records
 provide drill-down context.
+
+Notification `last_attempt_at` consistently means the delivery-attempt instant. A claimed delivery writes it when the
+claim begins; `finalizeFailed` later preserves that instant whether it schedules a retry or enters FAILED. The legacy
+`markFailed` and `markDeliveryAttemptFailed` paths write it as they record their failed attempt. Expired PROCESSING
+claims terminalized after exhausting attempts also preserve the earlier claim-attempt instant. ADMIN requeue leaves
+FAILED and clears `last_attempt_at`. Consequently the FAILED gauge deliberately reports oldest last-attempt age rather
+than claiming to measure exact time since entry into FAILED; no additional persistence column or index is justified.
 
 Tagging rules:
 

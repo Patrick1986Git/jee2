@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +14,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 
 @Component
 @ConditionalOnProperty(name = "spring.datasource.url")
-@ConditionalOnBean(NotificationRepository.class)
 public class NotificationDeliveryMetrics {
 
     public NotificationDeliveryMetrics(NotificationRepository repository, MeterRegistry meters, Clock clock) {
@@ -25,8 +23,8 @@ public class NotificationDeliveryMetrics {
                 value -> ageSeconds(value.findOldestActionableAt(clock.instant()), clock));
         meters.gauge("shop.notification.failed.count", repository,
                 value -> value.countByStatus(NotificationStatus.FAILED));
-        meters.gauge("shop.notification.failed.oldest.age.seconds", repository,
-                value -> ageSeconds(value.findOldestFailedAt(), clock));
+        meters.gauge("shop.notification.failed.oldest.last_attempt.age.seconds", repository,
+                value -> ageSeconds(value.findOldestFailedLastAttemptAt(), clock));
     }
 
     private static double ageSeconds(Optional<java.time.Instant> oldest, Clock clock) {

@@ -61,7 +61,7 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     Optional<Instant> findOldestActionableAt(@Param("now") Instant now);
 
     @Query("select min(n.lastAttemptAt) from Notification n where n.status = 'FAILED'")
-    Optional<Instant> findOldestFailedAt();
+    Optional<Instant> findOldestFailedLastAttemptAt();
 
     @Query(value = """
             SELECT *

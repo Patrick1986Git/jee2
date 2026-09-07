@@ -328,7 +328,28 @@ class NotificationRepositoryIT extends PostgresContainerSupport {
                 NotificationStatus.FAILED, "failed");
 
         assertThat(notificationRepository.countByStatus(NotificationStatus.FAILED)).isEqualTo(2);
-        assertThat(notificationRepository.findOldestFailedAt()).contains(now.minusSeconds(300));
+        assertThat(notificationRepository.findOldestFailedLastAttemptAt()).contains(now.minusSeconds(300));
+    }
+
+    @Test
+    void failExhaustedExpiredClaims_shouldPreserveTheDeliveryLastAttemptTimestamp() {
+        Instant now = Instant.parse("2026-09-07T12:00:00Z");
+        Instant claimAttemptAt = now.minusSeconds(600);
+        UUID notificationId = UUID.randomUUID();
+        insertNotification(notificationId, NotificationStatus.PENDING, now.minusSeconds(900), null);
+        jdbcTemplate.update("""
+                UPDATE notifications SET status = 'PROCESSING', attempts = 3, last_attempt_at = ?,
+                  claim_token = ?, claim_expires_at = ? WHERE id = ?
+                """, java.sql.Timestamp.from(claimAttemptAt), UUID.randomUUID(),
+                java.sql.Timestamp.from(now.minusSeconds(60)), notificationId);
+
+        assertThat(notificationRepository.failExhaustedExpiredClaims(now, 3)).isOne();
+
+        Map<String, Object> failed = jdbcTemplate.queryForMap(
+                "SELECT status, last_attempt_at FROM notifications WHERE id = ?", notificationId);
+        assertThat(failed.get("status")).isEqualTo(NotificationStatus.FAILED.name());
+        assertThat(((java.sql.Timestamp) failed.get("last_attempt_at")).toInstant()).isEqualTo(claimAttemptAt);
+        assertThat(notificationRepository.findOldestFailedLastAttemptAt()).contains(claimAttemptAt);
     }
 
     @Test

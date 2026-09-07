@@ -3,7 +3,6 @@ package com.company.shop.module.order.outbox;
 import java.time.Clock;
 import java.time.Duration;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -11,7 +10,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 
 @Component
 @ConditionalOnProperty(name = "spring.datasource.url")
-@ConditionalOnBean(OutboxEventRepository.class)
 public class OutboxEventMetrics {
 
     public OutboxEventMetrics(OutboxEventRepository repository, MeterRegistry meters, Clock clock) {

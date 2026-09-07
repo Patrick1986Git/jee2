@@ -21,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.company.shop.module.cart.service.CartService;
 import com.company.shop.module.category.service.CategoryService;
 import com.company.shop.module.notification.delivery.NotificationDeliveryProcessor;
+import com.company.shop.module.notification.delivery.NotificationDeliveryMetrics;
 import com.company.shop.module.notification.delivery.NotificationDeliveryTransactionalWorker;
 import com.company.shop.module.notification.outbox.OrderPlacedNotificationHandler;
 import com.company.shop.module.notification.service.NotificationAdminActionLogQueryService;
@@ -39,6 +40,7 @@ import com.company.shop.module.order.outbox.OutboxEventAdminActionLogQueryServic
 import com.company.shop.module.order.outbox.OutboxEventAdminCommandService;
 import com.company.shop.module.order.outbox.OutboxEventFailureRecorder;
 import com.company.shop.module.order.outbox.OutboxEventProcessor;
+import com.company.shop.module.order.outbox.OutboxEventMetrics;
 import com.company.shop.module.order.outbox.OutboxEventQueryService;
 import com.company.shop.module.order.outbox.OrderOutboxEventRecorder;
 import com.company.shop.module.order.outbox.OutboxEventTransactionalWorker;
@@ -88,13 +90,15 @@ import com.company.shop.security.jwt.JwtTokenProvider;
         ProductCatalogFacade.class, ProductReviewService.class, CartService.class, UserService.class,
         NotificationService.class, NotificationQueryService.class, NotificationAdminCommandService.class,
         NotificationAdminActionLogQueryService.class, OrderPlacedNotificationHandler.class,
-        NotificationDeliveryProcessor.class, NotificationDeliveryTransactionalWorker.class, OrderService.class,
+        NotificationDeliveryProcessor.class, NotificationDeliveryTransactionalWorker.class,
+        NotificationDeliveryMetrics.class, OrderService.class,
         ReservationExpirationClaimService.class, ReservationExpirationMetrics.class, ReservationExpirationPoller.class,
         ReservationExpirationProcessor.class, ReservationExpirationRecoveryService.class,
         ReservationExpirationWorkQueryService.class,
         ReservationExpirationAdminActionLogQueryService.class, LegacyReservationService.class,
         OrderCheckoutProcessor.class, OrderQueryProcessor.class, OrderOutboxEventRecorder.class,
         OutboxEventProcessor.class, OutboxEventTransactionalWorker.class, OutboxEventFailureRecorder.class,
+        OutboxEventMetrics.class,
         OutboxEventQueryService.class, OutboxEventAdminCommandService.class,
         OutboxEventAdminActionLogQueryService.class, PaymentService.class,
         PaymentInitializationTransactionService.class, PaymentTerminalTransitionService.class,
