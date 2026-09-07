@@ -218,6 +218,31 @@ class OutboxEventRepositoryIT extends PostgresContainerSupport {
     }
 
     @Test
+    void backlogQueries_shouldUseDueTimeAndDeadLetterAttemptTime() {
+        Instant now = Instant.parse("2026-09-07T12:00:00Z");
+        UUID immediateId = UUID.randomUUID();
+        UUID retryId = UUID.randomUUID();
+        UUID futureId = UUID.randomUUID();
+        UUID oldestDeadLetterId = UUID.randomUUID();
+        UUID newestDeadLetterId = UUID.randomUUID();
+
+        insertOutboxEvent(immediateId, OutboxEventStatus.PENDING, now.minusSeconds(300));
+        insertOutboxEventWithNextAttemptAt(retryId, OutboxEventStatus.PENDING,
+                now.minusSeconds(600), now.minusSeconds(60));
+        insertOutboxEventWithNextAttemptAt(futureId, OutboxEventStatus.PENDING,
+                now.minusSeconds(900), now.plusSeconds(60));
+        insertOutboxEventWithAttemptMetadata(oldestDeadLetterId, OutboxEventStatus.DEAD_LETTER,
+                now.minusSeconds(1200), now.minusSeconds(240), 3);
+        insertOutboxEventWithAttemptMetadata(newestDeadLetterId, OutboxEventStatus.DEAD_LETTER,
+                now.minusSeconds(900), now.minusSeconds(120), 3);
+
+        assertThat(outboxEventRepository.countActionable(now)).isEqualTo(2);
+        assertThat(outboxEventRepository.findOldestActionableAt(now)).contains(now.minusSeconds(300));
+        assertThat(outboxEventRepository.countByStatus(OutboxEventStatus.DEAD_LETTER)).isEqualTo(2);
+        assertThat(outboxEventRepository.findOldestDeadLetterAt()).contains(now.minusSeconds(240));
+    }
+
+    @Test
     void summaryQueries_shouldReturnCountsAndOperationalTimestamps() {
         Instant oldestPendingCreatedAt = Instant.parse("2026-01-01T10:00:00Z");
         Instant newestFailedCreatedAt = Instant.parse("2026-01-01T10:04:00Z");
