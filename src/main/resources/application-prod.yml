@@ -52,6 +52,19 @@ springdoc:
 server:
   forward-headers-strategy: none
 
+# Production traffic routing must use readiness, while liveness deliberately
+# excludes shared dependencies to avoid restart loops during a database outage.
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+
 # #############################################################################
 # SECURITY: JWT CONFIGURATION
 # Cryptographic settings for authentication.

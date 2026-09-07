@@ -8,6 +8,9 @@ spring:
   application:
     name: enterprise-shop
 
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
   # Global MVC & Resource Handling
   # Configuration ensures that 404 errors are handled as exceptions for consistent API responses.
   mvc:
@@ -49,6 +52,7 @@ springdoc:
 # #############################################################################
 server:
   port: 8080
+  shutdown: graceful
   # Error response detail level (Adjust to 'never' for Production environment)
   error:
     include-message: always

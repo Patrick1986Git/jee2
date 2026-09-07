@@ -2,6 +2,9 @@ package com.company.shop.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Properties;
 
 import org.junit.jupiter.api.Test;
@@ -55,6 +58,32 @@ class ApplicationConfigurationProfileTest {
         Properties properties = loadProperties("application-prod.yml");
 
         assertThat(properties.getProperty("server.forward-headers-strategy")).isEqualTo("none");
+    }
+
+    @Test
+    void baseConfiguration_shouldDefineBoundedGracefulShutdown() {
+        Properties properties = loadProperties("application.yml");
+
+        assertThat(properties.getProperty("server.shutdown")).isEqualTo("graceful");
+        assertThat(properties.getProperty("spring.lifecycle.timeout-per-shutdown-phase")).isEqualTo("30s");
+    }
+
+    @Test
+    void composeConfiguration_shouldAllowBothBlockingLifecyclePhasesToFinish() throws IOException {
+        String compose = Files.readString(Path.of("docker-compose.yml"));
+
+        assertThat(compose).contains("stop_grace_period: 65s");
+    }
+
+    @Test
+    void prodConfiguration_shouldSeparateLivenessFromDatabaseBackedReadiness() {
+        Properties properties = loadProperties("application-prod.yml");
+
+        assertThat(properties.getProperty("management.endpoint.health.probes.enabled")).isEqualTo("true");
+        assertThat(properties.getProperty("management.endpoint.health.group.liveness.include"))
+                .isEqualTo("livenessState");
+        assertThat(properties.getProperty("management.endpoint.health.group.readiness.include"))
+                .isEqualTo("readinessState,db");
     }
 
     @Test
