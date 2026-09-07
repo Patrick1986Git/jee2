@@ -27,6 +27,8 @@ The recovery point must contain a transactionally consistent set of:
 - notifications and delivery attempt, claim/lease, retry, sent, requeue, and failure state; and
 - notification, outbox, and reservation ADMIN action histories.
 
+The [operational data-retention contract](./data-retention.md) currently authorizes no age-based purge. Any future approved purge changes this authoritative recovery set and must be reflected in backup expectations and restore rehearsals.
+
 ### Schema and database-local state
 
 Recovery also requires `flyway_schema_history`; sequence/identity values; tables and columns; foreign keys, checks, uniqueness constraints, indexes, triggers, and functions; the `uuid-ossp` and `unaccent` extensions; the Polish text-search dictionary/configuration and product search artifacts; database and schema ownership; object ownership and ACLs; owner-specific default privileges; and the relationship between the administrative, migration, and runtime roles.

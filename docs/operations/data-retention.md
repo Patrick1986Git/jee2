@@ -1,0 +1,198 @@
+# Operational data retention and archival boundary
+
+## Decision
+
+**No production age-based purge is currently authorized by repository-owned policy.**
+
+The repository does not encode safe numeric retention periods for operational records. Legal,
+business, privacy, provider, and deployment retention periods must not be invented. A numeric
+cutoff requires explicit external policy and correctness evidence before cleanup is designed or
+enabled.
+
+This is a retention boundary, not a cleanup procedure. The application has no authorized purge
+worker, maintenance endpoint, or archive facility.
+
+## Retention classes
+
+### Class 1 — correctness-critical
+
+These records must not be deleted merely because they are old:
+
+- `stripe_webhook_events`, whose provider event IDs enforce exact webhook replay protection;
+- actionable or recoverable `outbox_events`;
+- `PENDING` and `PROCESSING` notifications;
+- `FAILED` notifications while ADMIN requeue remains supported;
+- `reservation_expiration_work`, including `COMPLETED` rows while the unique order row remains
+  the duplicate-work barrier;
+- checkout idempotency keys; and
+- order, payment, and provider identifiers needed for idempotency or reconciliation.
+
+Class 1 data remains until a stronger invariant or authoritative external guarantee proves a safe
+boundary. Age and terminal status alone are insufficient.
+
+### Class 2 — bounded correctness window
+
+**No current record family has a repository-proven numeric Class 2 window.** Possible future
+candidates require authoritative evidence such as a provider replay guarantee, an explicit client
+idempotency retry contract, or a proven reconciliation horizon. This document assigns no numeric
+value to those windows.
+
+### Class 3 — operational or audit history
+
+This class includes:
+
+- processed outbox history after all correctness dependencies end;
+- sent notification history after source-event deduplication dependencies end;
+- failed or dead-letter forensic history after recovery is formally closed; and
+- `notification_admin_action_logs`, `outbox_event_admin_action_logs`, and
+  `reservation_expiration_admin_action_logs`.
+
+Correctness may eventually stop depending on a Class 3 record, but its retention duration remains
+business, security, legal, and deployment owned.
+
+### Class 4 — disposable implementation residue
+
+**None currently proven.**
+
+## Stripe webhook invariant
+
+`stripe_webhook_events.stripe_event_id` is the exact durable provider-event replay barrier. The
+webhook registrar inserts the event ID before handling it and treats a uniqueness conflict as a
+duplicate. Deleting that row can make the same repeated, correctly signed Stripe event appear new
+again.
+
+Order and payment terminal transitions converge in several repeated-delivery cases. That reduces
+the risk of repeated terminal mutation, but it is not a substitute for exact provider-event
+idempotency and does not establish a safe replay horizon.
+
+Therefore:
+
+- do not age-purge webhook event IDs;
+- do not invent a Stripe replay duration; and
+- require an authoritative provider replay and reconciliation contract before considering archive,
+  tombstone, or purge behavior.
+
+## Outbox invariant
+
+### `PENDING` and retryable
+
+Never age-purge an actionable event. An old event may represent an extended outage or scheduled
+retry, not abandoned work. This rule also applies after manual requeue returns an event to
+`PENDING`.
+
+### `FAILED` and `DEAD_LETTER`
+
+These rows remain investigation, payload-inspection, recovery, and manual-requeue targets. Their
+error, dead-letter, attempt, and action-history context can be incident evidence. A failed or
+dead-letter state does not make an event disposable.
+
+### `PROCESSED`
+
+A processed event is only a potential future retention candidate after all of these conditions are
+met:
+
+- notification source-event deduplication remains effective without the full row;
+- ADMIN query, action-history, and forensic requirements are resolved; and
+- the changed backup and disaster-recovery recovery set is explicitly accepted.
+
+No processed-event deletion is currently authorized.
+
+## Notification invariant
+
+- `PENDING` and `PROCESSING` rows are correctness-critical delivery or claim-recovery work.
+- `FAILED` rows remain recoverable through ADMIN requeue and retain delivery-failure evidence.
+- `SENT` rows currently retain source-event deduplication evidence through the unique non-null
+  `source_event_id` value.
+- `recipient`, `subject`, and `body` contain potentially personal or sensitive information; errors
+  and requeue actor fields may also contain identifiers.
+
+Any future notification policy must make three independent decisions rather than using one
+arbitrary period:
+
+1. the correctness minimum for delivery, claim recovery, requeue, and source-event deduplication;
+2. the operational-debugging and incident-investigation period; and
+3. the business, legal, and privacy retention period for content and metadata.
+
+## ADMIN action-history invariant
+
+The three ADMIN history tables are append-only for runtime credentials under V45:
+
+- `notification_admin_action_logs`;
+- `outbox_event_admin_action_logs`; and
+- `reservation_expiration_admin_action_logs`.
+
+Do not add runtime cleanup for these tables or weaken V45. If future policy requires deletion, it
+must use a distinct privileged administrative or migration identity, be independently audited, and
+resolve legal holds, export requirements, and other preconditions first. Execution must use bounded
+batches. This repository currently provides no such maintenance mechanism.
+
+## Reservation-expiration work invariant
+
+`reservation_expiration_work.order_id` is unique. The persisted row therefore participates in
+preventing duplicate adoption or enqueue for an order. A `COMPLETED` row is not automatically
+disposable.
+
+Future deletion requires proof that every creation and legacy-adoption path remains duplicate-safe
+without the row, or a replacement tombstone that preserves the invariant.
+
+## Relationship warning
+
+Several operational relationships are application-level references rather than database foreign
+keys, including:
+
+- `notifications.source_event_id` to `outbox_events.id`;
+- notification ADMIN history to its notification;
+- outbox ADMIN history to its outbox event; and
+- reservation ADMIN history to its order and work row.
+
+**Absence of a foreign key is not evidence that deletion is safe.** Deleting a referenced record
+can remove drill-down context, break deduplication assumptions, or leave logically orphaned audit
+evidence. Cascade deletion of audit history is not an approved retention strategy.
+
+## Growth and disaster recovery
+
+Indefinite retention increases table and index size, logical-backup size, restore duration,
+post-restore reconciliation work, and pressure on the feasible RTO. Premature deletion can instead
+remove replay or idempotency barriers, provider reconciliation evidence, recovery targets, and
+operator history. Storage optimization must not override correctness.
+
+This boundary extends the [PostgreSQL disaster-recovery contract](./disaster-recovery.md). A purge
+changes the authoritative recovery set because deleted data will not appear in later backups. Any
+future retention mechanism must be included in restore rehearsals, and must not remove the only
+evidence available to reconcile Stripe or another provider with restored local state.
+
+## Required external inputs
+
+Before implementing any purge or archive operation, record and approve at least:
+
+- authoritative Stripe replay and provider/local reconciliation guarantees;
+- business, legal, and privacy retention decisions;
+- the incident-investigation and manual-recovery horizon;
+- notification content-versus-metadata retention policy;
+- the checkout-idempotency replay contract;
+- archive destination, access, integrity, verification, and destruction policy when archival is
+  required;
+- backup, PITR, restore-rehearsal, and RPO/RTO interaction;
+- the privileged maintenance identity and independent audit destination; and
+- measured production cardinality and table/index growth.
+
+This repository does not interpret GDPR, CCPA, tax, accounting, or other legal requirements. Those
+decisions are external inputs to a later engineering change.
+
+## Constraints on a future implementation
+
+Any later authorized retention mechanism must provide:
+
+- bounded batches and indexed cutoff predicates;
+- deterministic status and precondition checks that exclude actionable work;
+- restart-safe, idempotent behavior and multi-replica safety;
+- no large or unbounded delete transaction;
+- low-cardinality outcomes and row-count observability;
+- no logging of notification bodies, outbox payloads, secrets, or personal-data dumps;
+- verified archival before deletion when archival is required;
+- durable tombstones where identity must survive but payload need not; and
+- privileged execution for ADMIN history retention without expanding runtime privileges.
+
+Prefer deployment-owned privileged maintenance initially over another runtime `@Scheduled` worker.
+A runtime scheduler requires separate evidence that its ownership, authorization, locking,
+multi-replica, and failure-recovery model is appropriate.
