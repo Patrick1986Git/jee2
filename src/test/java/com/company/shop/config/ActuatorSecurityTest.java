@@ -33,6 +33,7 @@ import com.company.shop.security.jwt.JwtTokenProvider;
         properties = {
                 "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
                 "management.endpoint.health.show-details=when_authorized",
+                "management.endpoint.health.probes.enabled=true",
                 "management.endpoint.prometheus.enabled=true",
                 "management.prometheus.metrics.export.enabled=true",
                 "spring.autoconfigure.exclude="
@@ -61,6 +62,13 @@ class ActuatorSecurityTest {
     @Test
     void actuatorHealth_shouldReturnOkForAnonymous() throws Exception {
         mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "/actuator/health/liveness", "/actuator/health/readiness" })
+    void actuatorAvailabilityProbes_shouldReturnOkForAnonymous(String endpoint) throws Exception {
+        mockMvc.perform(get(endpoint))
                 .andExpect(status().isOk());
     }
 

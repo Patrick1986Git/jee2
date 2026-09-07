@@ -68,6 +68,7 @@ import com.company.shop.security.jwt.JwtTokenProvider;
                         + "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
                         + "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,"
                         + "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration",
+                "management.endpoint.health.validate-group-membership=false",
                 "spring.datasource.url=jdbc:postgresql://localhost:5432/test",
                 "spring.datasource.username=test",
                 "spring.datasource.password=test",

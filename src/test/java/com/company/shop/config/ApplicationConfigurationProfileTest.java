@@ -58,6 +58,25 @@ class ApplicationConfigurationProfileTest {
     }
 
     @Test
+    void baseConfiguration_shouldDefineBoundedGracefulShutdown() {
+        Properties properties = loadProperties("application.yml");
+
+        assertThat(properties.getProperty("server.shutdown")).isEqualTo("graceful");
+        assertThat(properties.getProperty("spring.lifecycle.timeout-per-shutdown-phase")).isEqualTo("30s");
+    }
+
+    @Test
+    void prodConfiguration_shouldSeparateLivenessFromDatabaseBackedReadiness() {
+        Properties properties = loadProperties("application-prod.yml");
+
+        assertThat(properties.getProperty("management.endpoint.health.probes.enabled")).isEqualTo("true");
+        assertThat(properties.getProperty("management.endpoint.health.group.liveness.include"))
+                .isEqualTo("livenessState");
+        assertThat(properties.getProperty("management.endpoint.health.group.readiness.include"))
+                .isEqualTo("readinessState,db");
+    }
+
+    @Test
     void prodConfiguration_shouldRequireDedicatedFlywayCredentialsAndRejectAutomaticBaselining() {
         Properties properties = loadProperties("application-prod.yml");
 

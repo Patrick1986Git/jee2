@@ -27,6 +27,7 @@ This `docs/` folder contains practical documentation that is currently grounded 
 - [`operations/container-security.md`](./operations/container-security.md) — Dockerfile linting, image vulnerability scanning, SBOM artifacts, and local reproduction commands.
 - [`operations/migrations.md`](./operations/migrations.md) — Flyway migration sequence and migration rules.
 - [`operations/observability.md`](./operations/observability.md) — request correlation, logs, actuator exposure, Prometheus, and custom metrics.
+- [`operations/application-lifecycle.md`](./operations/application-lifecycle.md) — readiness, liveness, graceful termination, worker recovery, and deployment-owned draining.
 - [`operations/outbox-observability.md`](./operations/outbox-observability.md) — admin transactional outbox health indicators, filters, requeue auditability, and action log queries.
 - [`operations/notification-observability.md`](./operations/notification-observability.md) — admin notification delivery indicators, filters, requeue auditability, and action log queries.
 - [`operations/release-checklist.md`](./operations/release-checklist.md) — lightweight pre-merge release checklist.
