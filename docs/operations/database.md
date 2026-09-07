@@ -34,7 +34,7 @@ Use `scripts/transfer-prod-db-ownership.sh` only as a reviewed maintenance opera
 
 For an existing database, use this ordering:
 
-1. Back up the database and provision the distinct migration identity.
+1. Create and verify a recoverable backup under the [disaster-recovery contract](./disaster-recovery.md), then provision the distinct migration identity.
 2. Audit the legacy runtime role's ownership and review the transfer script inputs against the intended database and schema.
 3. Stop application writers, run the privileged ownership transfer, and independently verify owners and runtime grants.
 4. Configure `DATABASE_*` for runtime and `FLYWAY_*` for migration through secret management.
