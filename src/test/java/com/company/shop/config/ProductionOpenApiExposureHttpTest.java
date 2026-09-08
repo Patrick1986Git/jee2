@@ -81,7 +81,10 @@ import com.company.shop.security.jwt.JwtTokenProvider;
                 "security.jwt.secret=dGVzdC1vbmx5LTMyLWJ5dGUtand0LXNlY3JldC1rZXkh",
                 "stripe.api-key=sk_test_placeholder",
                 "stripe.webhook-secret=whsec_placeholder",
-                "stripe.public-key=pk_test_placeholder"
+                "stripe.public-key=pk_test_placeholder",
+                "stripe.network.connect-timeout=PT1S",
+                "stripe.network.read-timeout=PT2S",
+                "stripe.network.max-network-retries=0"
         })
 @ActiveProfiles("prod")
 @MockitoBean(types = {

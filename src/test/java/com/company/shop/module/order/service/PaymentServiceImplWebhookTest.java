@@ -75,7 +75,7 @@ class PaymentServiceImplWebhookTest {
                 meterRegistry, new PaymentTerminalTransitionService(orderRepository,
                         paymentRepository, cartCheckoutFacade, productCatalogFacade),
                 new PaymentInitializationTransactionService(orderRepository, paymentRepository),
-                new com.company.shop.module.order.expiration.StripePaymentIntentGatewayImpl());
+                mock(com.company.shop.module.order.expiration.StripePaymentIntentGateway.class));
         setField(service, "webhookSecret", "whsec_test_123");
     }
 

@@ -85,7 +85,11 @@ import tools.jackson.databind.ObjectMapper;
                         + "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration",
                 "security.jwt.key-id=test-current",
                 "security.jwt.secret=dGVzdC1vbmx5LTMyLWJ5dGUtand0LXNlY3JldC1rZXkh",
-                "security.jwt.expiration=3600000"
+                "security.jwt.expiration=3600000",
+                "stripe.api-key=sk_test_placeholder",
+                "stripe.network.connect-timeout=PT1S",
+                "stripe.network.read-timeout=PT2S",
+                "stripe.network.max-network-retries=0"
         }
 )
 @AutoConfigureMockMvc

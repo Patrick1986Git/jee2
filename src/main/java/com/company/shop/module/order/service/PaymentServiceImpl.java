@@ -33,7 +33,6 @@ import com.company.shop.module.order.exception.WebhookSignatureInvalidException;
 import com.company.shop.module.order.repository.OrderRepository;
 import com.company.shop.module.order.repository.PaymentRepository;
 import com.company.shop.module.order.expiration.StripePaymentIntentGateway;
-import com.stripe.Stripe;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.Webhook;
 
@@ -51,9 +50,6 @@ public class PaymentServiceImpl implements PaymentService {
     private static final String RESULT_DUPLICATE = "duplicate";
     private static final String RESULT_IGNORED = "ignored";
     private static final String RESULT_FAILED = "failed";
-
-    @Value("${stripe.api-key}")
-    private String secretKey;
 
     @Value("${stripe.webhook-secret}")
     private String webhookSecret;
@@ -85,10 +81,6 @@ public class PaymentServiceImpl implements PaymentService {
 
     @PostConstruct
     public void init() {
-        if (secretKey == null || secretKey.isBlank()) {
-            log.error("Stripe API key is missing in configuration.");
-            throw new StripeConfigurationException("Stripe API key is missing in configuration.");
-        }
         if (webhookSecret == null || webhookSecret.isBlank()) {
             log.error("Stripe webhook secret is missing in configuration.");
             throw new StripeConfigurationException("Stripe webhook secret is missing in configuration.");
@@ -97,7 +89,6 @@ public class PaymentServiceImpl implements PaymentService {
             log.error("Stripe public key is missing in configuration.");
             throw new StripeConfigurationException("Stripe public key is missing in configuration.");
         }
-        Stripe.apiKey = secretKey;
     }
 
     @Override

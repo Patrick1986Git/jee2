@@ -63,6 +63,11 @@ stripe:
   api-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
   public-key: ${STRIPE_PUBLIC_KEY:pk_test_placeholder}
+  # Explicit SDK-equivalent development values; production has no fallbacks.
+  network:
+    connect-timeout: ${STRIPE_CONNECT_TIMEOUT:PT30S}
+    read-timeout: ${STRIPE_READ_TIMEOUT:PT80S}
+    max-network-retries: ${STRIPE_MAX_NETWORK_RETRIES:2}
 
 # #############################################################################
 # OBSERVABILITY & LOGGING (Dev Specific)
