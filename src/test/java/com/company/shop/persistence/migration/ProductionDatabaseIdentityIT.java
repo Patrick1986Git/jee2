@@ -85,6 +85,9 @@ class ProductionDatabaseIdentityIT {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", () -> RUNTIME_USER);
         registry.add("spring.datasource.password", () -> RUNTIME_PASSWORD);
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> 4);
+        registry.add("spring.datasource.hikari.minimum-idle", () -> 0);
+        registry.add("spring.datasource.hikari.connection-timeout", () -> 1_000);
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
         registry.add("spring.flyway.user", () -> MIGRATION_USER);
         registry.add("spring.flyway.password", () -> MIGRATION_PASSWORD);

@@ -99,6 +99,18 @@ class ApplicationConfigurationProfileTest {
     }
 
     @Test
+    void prodConfiguration_shouldRequireDeploymentOwnedHikariCapacityAndAcquisitionTimeout() {
+        Properties properties = loadProperties("application-prod.yml");
+
+        assertThat(properties.getProperty("spring.datasource.hikari.maximum-pool-size"))
+                .isEqualTo("${DATABASE_MAXIMUM_POOL_SIZE}");
+        assertThat(properties.getProperty("spring.datasource.hikari.minimum-idle"))
+                .isEqualTo("${DATABASE_MINIMUM_IDLE}");
+        assertThat(properties.getProperty("spring.datasource.hikari.connection-timeout"))
+                .isEqualTo("${DATABASE_CONNECTION_TIMEOUT_MILLISECONDS}");
+    }
+
+    @Test
     void prodConfiguration_shouldUseSafeSpringBootFallbackErrorDefaults() {
         new ApplicationContextRunner()
                 .withInitializer(new ConfigDataApplicationContextInitializer())
@@ -227,7 +239,10 @@ class ApplicationConfigurationProfileTest {
                         "spring.profiles.active=prod",
                         TEST_DATABASE_PROPERTIES,
                         "DATABASE_USERNAME=runtime_user",
-                        "DATABASE_PASSWORD=runtime_password");
+                        "DATABASE_PASSWORD=runtime_password",
+                        "DATABASE_MAXIMUM_POOL_SIZE=4",
+                        "DATABASE_MINIMUM_IDLE=0",
+                        "DATABASE_CONNECTION_TIMEOUT_MILLISECONDS=1000");
     }
 
     private static Properties loadProperties(String resourceName) {
