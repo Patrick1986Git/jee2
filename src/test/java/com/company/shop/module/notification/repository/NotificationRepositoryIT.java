@@ -293,6 +293,66 @@ class NotificationRepositoryIT extends PostgresContainerSupport {
     }
 
     @Test
+    void backlogQueries_shouldIncludeDuePendingAndExpiredClaimsButExcludeFutureWork() {
+        Instant now = Instant.parse("2026-09-07T12:00:00Z");
+        UUID immediateId = UUID.randomUUID();
+        UUID retryId = UUID.randomUUID();
+        UUID futureId = UUID.randomUUID();
+        UUID expiredClaimId = UUID.randomUUID();
+        UUID activeClaimId = UUID.randomUUID();
+
+        insertNotification(immediateId, NotificationStatus.PENDING, now.minusSeconds(300), null);
+        insertNotification(retryId, NotificationStatus.PENDING, now.minusSeconds(600), now.minusSeconds(60));
+        insertNotification(futureId, NotificationStatus.PENDING, now.minusSeconds(900), now.plusSeconds(60));
+        insertNotification(expiredClaimId, NotificationStatus.PENDING, now.minusSeconds(1200), null);
+        insertNotification(activeClaimId, NotificationStatus.PENDING, now.minusSeconds(1500), null);
+        jdbcTemplate.update("""
+                UPDATE notifications SET status = 'PROCESSING', attempts = 1,
+                  claim_token = ?, claim_expires_at = ?, next_attempt_at = NULL WHERE id = ?
+                """, UUID.randomUUID(), java.sql.Timestamp.from(now.minusSeconds(120)), expiredClaimId);
+        jdbcTemplate.update("""
+                UPDATE notifications SET status = 'PROCESSING', attempts = 1,
+                  claim_token = ?, claim_expires_at = ?, next_attempt_at = NULL WHERE id = ?
+                """, UUID.randomUUID(), java.sql.Timestamp.from(now.plusSeconds(120)), activeClaimId);
+
+        assertThat(notificationRepository.countActionable(now)).isEqualTo(3);
+        assertThat(notificationRepository.findOldestActionableAt(now)).contains(now.minusSeconds(300));
+    }
+
+    @Test
+    void failedBacklogQueries_shouldUseTerminalAttemptTime() {
+        Instant now = Instant.parse("2026-09-07T12:00:00Z");
+        notificationWithLastAttemptAt("old@example.com", now.minusSeconds(300),
+                NotificationStatus.FAILED, "failed");
+        notificationWithLastAttemptAt("new@example.com", now.minusSeconds(120),
+                NotificationStatus.FAILED, "failed");
+
+        assertThat(notificationRepository.countByStatus(NotificationStatus.FAILED)).isEqualTo(2);
+        assertThat(notificationRepository.findOldestFailedLastAttemptAt()).contains(now.minusSeconds(300));
+    }
+
+    @Test
+    void failExhaustedExpiredClaims_shouldPreserveTheDeliveryLastAttemptTimestamp() {
+        Instant now = Instant.parse("2026-09-07T12:00:00Z");
+        Instant claimAttemptAt = now.minusSeconds(600);
+        UUID notificationId = UUID.randomUUID();
+        insertNotification(notificationId, NotificationStatus.PENDING, now.minusSeconds(900), null);
+        jdbcTemplate.update("""
+                UPDATE notifications SET status = 'PROCESSING', attempts = 3, last_attempt_at = ?,
+                  claim_token = ?, claim_expires_at = ? WHERE id = ?
+                """, java.sql.Timestamp.from(claimAttemptAt), UUID.randomUUID(),
+                java.sql.Timestamp.from(now.minusSeconds(60)), notificationId);
+
+        assertThat(notificationRepository.failExhaustedExpiredClaims(now, 3)).isOne();
+
+        Map<String, Object> failed = jdbcTemplate.queryForMap(
+                "SELECT status, last_attempt_at FROM notifications WHERE id = ?", notificationId);
+        assertThat(failed.get("status")).isEqualTo(NotificationStatus.FAILED.name());
+        assertThat(((java.sql.Timestamp) failed.get("last_attempt_at")).toInstant()).isEqualTo(claimAttemptAt);
+        assertThat(notificationRepository.findOldestFailedLastAttemptAt()).contains(claimAttemptAt);
+    }
+
+    @Test
     void findPendingBatchForUpdate_shouldRespectBatchSize() {
         UUID firstPendingId = UUID.randomUUID();
         UUID secondPendingId = UUID.randomUUID();

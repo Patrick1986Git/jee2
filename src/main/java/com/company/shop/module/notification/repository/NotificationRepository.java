@@ -45,6 +45,25 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     long countScheduledPending(@Param("now") Instant now);
 
     @Query(value = """
+            SELECT COUNT(*) FROM notifications
+            WHERE (status = 'PENDING' AND (next_attempt_at IS NULL OR next_attempt_at <= :now))
+               OR (status = 'PROCESSING' AND claim_expires_at <= :now)
+            """, nativeQuery = true)
+    long countActionable(@Param("now") Instant now);
+
+    @Query(value = """
+            SELECT MIN(CASE WHEN status = 'PROCESSING' THEN claim_expires_at
+                            ELSE COALESCE(next_attempt_at, created_at) END)
+            FROM notifications
+            WHERE (status = 'PENDING' AND (next_attempt_at IS NULL OR next_attempt_at <= :now))
+               OR (status = 'PROCESSING' AND claim_expires_at <= :now)
+            """, nativeQuery = true)
+    Optional<Instant> findOldestActionableAt(@Param("now") Instant now);
+
+    @Query("select min(n.lastAttemptAt) from Notification n where n.status = 'FAILED'")
+    Optional<Instant> findOldestFailedLastAttemptAt();
+
+    @Query(value = """
             SELECT *
             FROM notifications
             WHERE ((status = 'PENDING' AND (next_attempt_at IS NULL OR next_attempt_at <= :now))

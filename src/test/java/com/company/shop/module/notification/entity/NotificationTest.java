@@ -182,12 +182,14 @@ class NotificationTest {
     void finalizeFailed_shouldBecomeTerminalAtMaxAttempts() {
         Notification notification = pendingNotification(UUID.randomUUID());
         UUID token = claim(notification);
+        Instant claimAttemptAt = notification.getLastAttemptAt();
 
         assertThat(notification.finalizeFailed(token, "terminal failure", 1, Instant.now().plusSeconds(60))).isTrue();
 
         assertThat(notification.getStatus()).isEqualTo(NotificationStatus.FAILED);
         assertThat(notification.getAttempts()).isEqualTo(1);
         assertThat(notification.getLastError()).isEqualTo("terminal failure");
+        assertThat(notification.getLastAttemptAt()).isEqualTo(claimAttemptAt);
         assertThat(notification.getNextAttemptAt()).isNull();
         assertThat(notification.getClaimToken()).isNull();
         assertThat(notification.getClaimExpiresAt()).isNull();

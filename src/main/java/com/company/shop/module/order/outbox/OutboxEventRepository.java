@@ -40,6 +40,23 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID>,
     @Query("select max(e.lastAttemptAt) from OutboxEvent e where e.status = :status")
     Optional<Instant> findNewestAttemptAtByStatus(@Param("status") OutboxEventStatus status);
 
+    @Query(value = """
+            SELECT COUNT(*) FROM outbox_events
+            WHERE status = 'PENDING'
+              AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
+            """, nativeQuery = true)
+    long countActionable(@Param("now") Instant now);
+
+    @Query(value = """
+            SELECT MIN(COALESCE(next_attempt_at, created_at)) FROM outbox_events
+            WHERE status = 'PENDING'
+              AND (next_attempt_at IS NULL OR next_attempt_at <= :now)
+            """, nativeQuery = true)
+    Optional<Instant> findOldestActionableAt(@Param("now") Instant now);
+
+    @Query("select min(e.lastAttemptAt) from OutboxEvent e where e.status = 'DEAD_LETTER'")
+    Optional<Instant> findOldestDeadLetterAt();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from OutboxEvent e where e.id = :eventId")
     Optional<OutboxEvent> findByIdForManualRequeueUpdate(@Param("eventId") UUID eventId);

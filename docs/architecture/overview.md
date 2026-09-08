@@ -4,7 +4,7 @@
 
 enterprise-shop is a Java 21 modular monolith built on the current repository stack:
 
-- Spring Boot 4.1.0
+- Spring Boot 4.1.1
 - Spring Web MVC
 - Spring Security with stateless JWT authentication
 - Spring Data JPA / Hibernate
@@ -60,4 +60,4 @@ Most business modules use the same package pattern when applicable:
 - **Security:** global filter chain plus method-level `@PreAuthorize` guards.
 - **Persistence:** Flyway migrations under `src/main/resources/db/migration`; historical migrations are not edited.
 - **Observability:** `X-Request-Id` correlation is stored in MDC as `requestId`, returned to clients, and included in the console log pattern.
-- **Metrics:** Micrometer counters currently cover checkout, payment intents, Stripe webhooks, and business exceptions.
+- **Metrics:** Micrometer counters cover synchronous business outcomes and reservation-expiration processing; database-backed gauges expose current reservation, outbox, and notification failure/backlog state.
