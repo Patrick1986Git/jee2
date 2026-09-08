@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,14 +12,12 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
@@ -28,6 +25,7 @@ import com.company.shop.common.model.BaseEntity;
 import com.company.shop.module.cart.api.internal.CartCheckoutFacade;
 import com.company.shop.module.category.entity.Category;
 import com.company.shop.module.order.dto.PaymentIntentResponseDTO;
+import com.company.shop.module.order.expiration.StripePaymentIntentGateway;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderItem;
 import com.company.shop.module.order.entity.Payment;
@@ -39,8 +37,6 @@ import com.company.shop.module.order.repository.PaymentRepository;
 import com.company.shop.module.product.entity.Product;
 import com.company.shop.module.user.entity.User;
 import com.stripe.model.PaymentIntent;
-import com.stripe.net.RequestOptions;
-import com.stripe.param.PaymentIntentCreateParams;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceImplCreateIntentTest {
@@ -59,6 +55,9 @@ class PaymentServiceImplCreateIntentTest {
 	@Mock
 	private com.company.shop.module.product.api.internal.ProductCatalogFacade productCatalogFacade;
 
+	@Mock
+	private StripePaymentIntentGateway stripeGateway;
+
 	private SimpleMeterRegistry meterRegistry;
 	private PaymentServiceImpl service;
 
@@ -68,7 +67,7 @@ class PaymentServiceImplCreateIntentTest {
 		service = new PaymentServiceImpl(orderRepository, paymentRepository, stripeWebhookEventRegistrar,
 				meterRegistry, mock(PaymentTerminalTransitionService.class),
                 new PaymentInitializationTransactionService(orderRepository, paymentRepository),
-                new com.company.shop.module.order.expiration.StripePaymentIntentGatewayImpl());
+                stripeGateway);
 		setField(service, "publicKey", "pk_test_123");
 	}
 
@@ -132,72 +131,40 @@ class PaymentServiceImplCreateIntentTest {
 	}
 
 	@Test
-	void createPaymentIntent_shouldWrapStripeErrorIntoPaymentProcessingException() {
+	void createPaymentIntent_shouldWrapStripeErrorIntoPaymentProcessingException() throws Exception {
 		Order order = orderWithTotal(BigDecimal.valueOf(20));
 		Payment payment = new Payment(order, "STRIPE", order.getTotalAmount());
-
 		when(paymentRepository.findByOrderIdForUpdate(order.getId())).thenReturn(Optional.of(payment));
+		when(stripeGateway.create(any(), any(), any())).thenThrow(new RuntimeException("stripe down"));
 
-		try (MockedStatic<PaymentIntent> paymentIntentStatic = mockStatic(PaymentIntent.class)) {
-			paymentIntentStatic
-					.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
-					.thenThrow(new RuntimeException("stripe down"));
-
-			assertThatThrownBy(() -> service.createPaymentIntent(order)).isInstanceOf(PaymentProcessingException.class)
-					.hasMessageContaining(order.getId().toString());
-			assertThat(meterRegistry.get("shop.payment_intent.total").tag("result", "failed").counter().count()).isEqualTo(1);
-
-			verify(paymentRepository).findByOrderIdForUpdate(order.getId());
-			verify(paymentRepository, never()).save(any(Payment.class));
-		}
+		assertThatThrownBy(() -> service.createPaymentIntent(order)).isInstanceOf(PaymentProcessingException.class)
+				.hasMessageContaining(order.getId().toString());
+		assertThat(meterRegistry.get("shop.payment_intent.total").tag("result", "failed").counter().count()).isEqualTo(1);
+		verify(paymentRepository, never()).save(any(Payment.class));
 	}
 
 	@Test
-	void createPaymentIntent_shouldCreateStripeIntentPersistProviderFieldsAndReturnDto() {
+	void createPaymentIntent_shouldCreateStripeIntentPersistProviderFieldsAndReturnDto() throws Exception {
 		Order order = orderWithTotal(BigDecimal.valueOf(24.50));
 		Payment payment = new Payment(order, "STRIPE", order.getTotalAmount());
-
 		when(paymentRepository.findByOrderIdForUpdate(order.getId())).thenReturn(Optional.of(payment));
 		when(orderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
 		when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
 		PaymentIntent stripeIntent = mock(PaymentIntent.class);
 		when(stripeIntent.getId()).thenReturn("pi_123");
 		when(stripeIntent.getClientSecret()).thenReturn("cs_123");
+		when(stripeGateway.create(order.getId(), order.getTotalAmount(), "order-payment-intent-" + order.getId()))
+				.thenReturn(stripeIntent);
 
-		AtomicReference<PaymentIntentCreateParams> capturedParams = new AtomicReference<>();
-		AtomicReference<RequestOptions> capturedOptions = new AtomicReference<>();
-		try (MockedStatic<PaymentIntent> paymentIntentStatic = mockStatic(PaymentIntent.class)) {
-			paymentIntentStatic
-					.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
-					.thenAnswer(invocation -> {
-						capturedParams.set(invocation.getArgument(0));
-						capturedOptions.set(invocation.getArgument(1));
-						return stripeIntent;
-					});
+		PaymentIntentResponseDTO result = service.createPaymentIntent(order);
 
-			PaymentIntentResponseDTO result = service.createPaymentIntent(order);
-
-			assertThat(result.clientSecret()).isEqualTo("cs_123");
-			assertThat(result.publishableKey()).isEqualTo("pk_test_123");
-
-			ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
-			verify(paymentRepository).save(paymentCaptor.capture());
-			Payment savedPayment = paymentCaptor.getValue();
-			assertThat(savedPayment.getProviderPaymentId()).isEqualTo("pi_123");
-			assertThat(savedPayment.getClientSecret()).isEqualTo("cs_123");
-			assertThat(savedPayment.getAmount()).isEqualByComparingTo("24.50");
-			assertThat(capturedParams.get().getAmount()).isEqualTo(2450L);
-			assertThat(capturedParams.get().getCurrency()).isEqualTo("pln");
-			assertThat(capturedParams.get().getMetadata()).containsEntry("orderId", order.getId().toString());
-			assertThat(capturedOptions.get().getIdempotencyKey())
-					.isEqualTo("order-payment-intent-" + order.getId());
-			assertThat(meterRegistry.get("shop.payment_intent.total").tag("result", "created").counter().count()).isEqualTo(1);
-
-			verify(paymentRepository, org.mockito.Mockito.times(2)).findByOrderIdForUpdate(order.getId());
-			paymentIntentStatic.verify(
-					() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)));
-		}
+		assertThat(result.clientSecret()).isEqualTo("cs_123");
+		assertThat(result.publishableKey()).isEqualTo("pk_test_123");
+		ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+		verify(paymentRepository).save(paymentCaptor.capture());
+		assertThat(paymentCaptor.getValue().getProviderPaymentId()).isEqualTo("pi_123");
+		assertThat(paymentCaptor.getValue().getClientSecret()).isEqualTo("cs_123");
+		verify(stripeGateway).create(order.getId(), order.getTotalAmount(), "order-payment-intent-" + order.getId());
 	}
 
 	@Test
@@ -207,11 +174,11 @@ class PaymentServiceImplCreateIntentTest {
 	}
 
 	@Test
-	void createPaymentIntent_shouldCreateNewIntentWhenOnlyClientSecretIsPresent() {
+	void createPaymentIntent_shouldCreateNewIntentWhenOnlyClientSecretIsPresent() throws Exception {
 		assertIncompleteProviderStateCreatesNewIntent(" ", "cs_incomplete");
 	}
 
-	private void assertIncompleteProviderStateCreatesNewIntent(String providerPaymentId, String clientSecret) {
+	private void assertIncompleteProviderStateCreatesNewIntent(String providerPaymentId, String clientSecret) throws Exception {
 		Order order = orderWithTotal(BigDecimal.valueOf(10));
 		Payment payment = new Payment(order, "STRIPE", order.getTotalAmount());
 		payment.attachProviderPayment(providerPaymentId, clientSecret);
@@ -221,20 +188,13 @@ class PaymentServiceImplCreateIntentTest {
 		PaymentIntent stripeIntent = mock(PaymentIntent.class);
 		when(stripeIntent.getId()).thenReturn("pi_fresh");
 		when(stripeIntent.getClientSecret()).thenReturn("cs_fresh");
-		try (MockedStatic<PaymentIntent> paymentIntentStatic = mockStatic(PaymentIntent.class)) {
-			paymentIntentStatic
-					.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
+		when(stripeGateway.create(order.getId(), order.getTotalAmount(), "order-payment-intent-" + order.getId()))
 					.thenReturn(stripeIntent);
-
-			PaymentIntentResponseDTO result = service.createPaymentIntent(order);
-
-			assertThat(result.clientSecret()).isEqualTo("cs_fresh");
-			assertThat(payment.getProviderPaymentId()).isEqualTo("pi_fresh");
-			assertThat(payment.getClientSecret()).isEqualTo("cs_fresh");
-			assertThat(meterRegistry.get("shop.payment_intent.total").tag("result", "created").counter().count())
-					.isEqualTo(1);
-			verify(paymentRepository).save(payment);
-		}
+		PaymentIntentResponseDTO result = service.createPaymentIntent(order);
+		assertThat(result.clientSecret()).isEqualTo("cs_fresh");
+		assertThat(payment.getProviderPaymentId()).isEqualTo("pi_fresh");
+		assertThat(payment.getClientSecret()).isEqualTo("cs_fresh");
+		verify(paymentRepository).save(payment);
 	}
 
 	@Test

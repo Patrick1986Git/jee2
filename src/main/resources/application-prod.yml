@@ -89,6 +89,10 @@ stripe:
   api-key: ${STRIPE_SECRET_KEY}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET}
   public-key: ${STRIPE_PUBLIC_KEY}
+  network:
+    connect-timeout: ${STRIPE_CONNECT_TIMEOUT}
+    read-timeout: ${STRIPE_READ_TIMEOUT}
+    max-network-retries: ${STRIPE_MAX_NETWORK_RETRIES}
 
 app:
   security:

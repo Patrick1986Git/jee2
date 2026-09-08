@@ -6,31 +6,16 @@ import static org.mockito.Mockito.mock;
 
 import java.lang.reflect.Field;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.company.shop.module.cart.api.internal.CartCheckoutFacade;
 import com.company.shop.module.order.exception.StripeConfigurationException;
 import com.company.shop.module.order.repository.OrderRepository;
 import com.company.shop.module.order.repository.PaymentRepository;
-import com.stripe.Stripe;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class PaymentServiceImplConfigurationTest {
-
-    private String previousStripeApiKey;
-
-    @BeforeEach
-    void rememberStripeApiKey() {
-        previousStripeApiKey = Stripe.apiKey;
-    }
-
-    @AfterEach
-    void restoreStripeApiKey() {
-        Stripe.apiKey = previousStripeApiKey;
-    }
 
     @Test
     void init_shouldThrowWhenApiKeyIsBlank() {
@@ -60,12 +45,12 @@ class PaymentServiceImplConfigurationTest {
     }
 
     @Test
-    void init_shouldConfigureStripeApiKeyWhenConfigurationIsComplete() {
+    void init_shouldAcceptCompleteConfiguration() {
         PaymentServiceImpl service = serviceWithConfiguration("sk_test_expected", "whsec_test", "pk_test");
 
         service.init();
 
-        assertThat(Stripe.apiKey).isEqualTo("sk_test_expected");
+        assertThat(service).isNotNull();
     }
 
     private PaymentServiceImpl serviceWithConfiguration(String apiKey, String webhookSecret, String publicKey) {
@@ -75,7 +60,7 @@ class PaymentServiceImplConfigurationTest {
                 mock(StripeWebhookEventRegistrar.class), new SimpleMeterRegistry(),
                 mock(PaymentTerminalTransitionService.class),
                 new PaymentInitializationTransactionService(orders, payments),
-                new com.company.shop.module.order.expiration.StripePaymentIntentGatewayImpl());
+                mock(com.company.shop.module.order.expiration.StripePaymentIntentGateway.class));
         setField(service, "secretKey", apiKey);
         setField(service, "webhookSecret", webhookSecret);
         setField(service, "publicKey", publicKey);

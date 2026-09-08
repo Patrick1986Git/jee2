@@ -30,3 +30,7 @@ stripe:
   api-key: sk_test_placeholder
   webhook-secret: whsec_placeholder
   public-key: pk_test_placeholder
+  network:
+    connect-timeout: PT1S
+    read-timeout: PT2S
+    max-network-retries: 0

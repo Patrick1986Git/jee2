@@ -33,7 +33,6 @@ import com.company.shop.module.order.exception.WebhookSignatureInvalidException;
 import com.company.shop.module.order.repository.OrderRepository;
 import com.company.shop.module.order.repository.PaymentRepository;
 import com.company.shop.module.order.expiration.StripePaymentIntentGateway;
-import com.stripe.Stripe;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.Webhook;
 
@@ -97,7 +96,6 @@ public class PaymentServiceImpl implements PaymentService {
             log.error("Stripe public key is missing in configuration.");
             throw new StripeConfigurationException("Stripe public key is missing in configuration.");
         }
-        Stripe.apiKey = secretKey;
     }
 
     @Override
