@@ -78,6 +78,24 @@ class StripeClientConfigurationTest {
     }
 
     @Test
+    void connectTimeoutMillis_shouldRejectNullValue() {
+        var properties = properties(null, Duration.ofSeconds(1), 0);
+
+        assertThatThrownBy(properties::connectTimeoutMillis)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("stripe.network.connect-timeout must be positive");
+    }
+
+    @Test
+    void readTimeoutMillis_shouldRejectNegativeValue() {
+        var properties = properties(Duration.ofSeconds(1), Duration.ofSeconds(-1), 0);
+
+        assertThatThrownBy(properties::readTimeoutMillis)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("stripe.network.read-timeout must be positive");
+    }
+
+    @Test
     void readTimeoutMillis_shouldRejectValuesOutsideSdkIntegerRange() {
         var properties = properties(Duration.ofSeconds(1), Duration.ofDays(30), 0);
 
@@ -93,6 +111,15 @@ class StripeClientConfigurationTest {
         assertThatThrownBy(() -> StripeClientConfiguration.stripeClientBuilder("sk_test_value", properties))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("max-network-retries must not be negative");
+    }
+
+    @Test
+    void stripeClientBuilder_shouldRejectNullApiKey() {
+        var properties = properties(Duration.ofSeconds(1), Duration.ofSeconds(1), 0);
+
+        assertThatThrownBy(() -> StripeClientConfiguration.stripeClientBuilder(null, properties))
+                .isInstanceOf(StripeConfigurationException.class)
+                .hasMessageContaining("Stripe API key is missing in configuration");
     }
 
     private StripeNetworkProperties properties(Duration connect, Duration read, int retries) {
