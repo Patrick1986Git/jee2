@@ -1,11 +1,41 @@
 package com.company.shop.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class ProductionHikariConfigurationValidatorTest {
+
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(ProductionHikariConfigurationValidator.class)
+            .withPropertyValues(
+                    "spring.profiles.active=prod",
+                    "spring.datasource.hikari.maximum-pool-size=4",
+                    "spring.datasource.hikari.minimum-idle=0",
+                    "spring.datasource.hikari.connection-timeout=1000");
+
+    @Test
+    void prodContext_shouldRegisterAndRunValidatorForValidSettings() {
+        contextRunner.run(context -> {
+            assertThatCode(() -> context.getBean(ProductionHikariConfigurationValidator.class))
+                    .doesNotThrowAnyException();
+            assertThat(context).hasNotFailed();
+        });
+    }
+
+    @Test
+    void prodContext_shouldFailWhenMinimumIdleExceedsMaximumPoolSize() {
+        contextRunner.withPropertyValues("spring.datasource.hikari.minimum-idle=5")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasRootCauseMessage("spring.datasource.hikari.minimum-idle must not exceed "
+                                    + "spring.datasource.hikari.maximum-pool-size");
+                });
+    }
 
     @Test
     void validate_shouldAcceptValidDeploymentOwnedSettings() {

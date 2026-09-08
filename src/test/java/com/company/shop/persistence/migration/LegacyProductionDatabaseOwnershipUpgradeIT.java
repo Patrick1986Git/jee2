@@ -158,6 +158,9 @@ class LegacyProductionDatabaseOwnershipUpgradeIT {
                         "DATABASE_URL", POSTGRES.getJdbcUrl(),
                         "DATABASE_USERNAME", LEGACY_RUNTIME_USER,
                         "DATABASE_PASSWORD", LEGACY_RUNTIME_PASSWORD,
+                        "DATABASE_MAXIMUM_POOL_SIZE", "4",
+                        "DATABASE_MINIMUM_IDLE", "0",
+                        "DATABASE_CONNECTION_TIMEOUT_MILLISECONDS", "1000",
                         "FLYWAY_URL", POSTGRES.getJdbcUrl(),
                         "FLYWAY_USER", MIGRATION_USER,
                         "FLYWAY_PASSWORD", MIGRATION_PASSWORD))
