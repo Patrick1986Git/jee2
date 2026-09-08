@@ -18,17 +18,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 class PaymentServiceImplConfigurationTest {
 
     @Test
-    void init_shouldThrowWhenApiKeyIsBlank() {
-        PaymentServiceImpl service = serviceWithConfiguration(" ", "whsec_test", "pk_test");
-
-        assertThatThrownBy(service::init)
-                .isInstanceOf(StripeConfigurationException.class)
-                .hasMessageContaining("API key");
-    }
-
-    @Test
     void init_shouldThrowWhenWebhookSecretIsMissing() {
-        PaymentServiceImpl service = serviceWithConfiguration("sk_test", null, "pk_test");
+        PaymentServiceImpl service = serviceWithConfiguration(null, "pk_test");
 
         assertThatThrownBy(service::init)
                 .isInstanceOf(StripeConfigurationException.class)
@@ -37,7 +28,7 @@ class PaymentServiceImplConfigurationTest {
 
     @Test
     void init_shouldThrowWhenPublicKeyIsBlank() {
-        PaymentServiceImpl service = serviceWithConfiguration("sk_test", "whsec_test", " ");
+        PaymentServiceImpl service = serviceWithConfiguration("whsec_test", " ");
 
         assertThatThrownBy(service::init)
                 .isInstanceOf(StripeConfigurationException.class)
@@ -46,14 +37,14 @@ class PaymentServiceImplConfigurationTest {
 
     @Test
     void init_shouldAcceptCompleteConfiguration() {
-        PaymentServiceImpl service = serviceWithConfiguration("sk_test_expected", "whsec_test", "pk_test");
+        PaymentServiceImpl service = serviceWithConfiguration("whsec_test", "pk_test");
 
         service.init();
 
         assertThat(service).isNotNull();
     }
 
-    private PaymentServiceImpl serviceWithConfiguration(String apiKey, String webhookSecret, String publicKey) {
+    private PaymentServiceImpl serviceWithConfiguration(String webhookSecret, String publicKey) {
         OrderRepository orders = mock(OrderRepository.class);
         PaymentRepository payments = mock(PaymentRepository.class);
         PaymentServiceImpl service = new PaymentServiceImpl(orders, payments,
@@ -61,7 +52,6 @@ class PaymentServiceImplConfigurationTest {
                 mock(PaymentTerminalTransitionService.class),
                 new PaymentInitializationTransactionService(orders, payments),
                 mock(com.company.shop.module.order.expiration.StripePaymentIntentGateway.class));
-        setField(service, "secretKey", apiKey);
         setField(service, "webhookSecret", webhookSecret);
         setField(service, "publicKey", publicKey);
         return service;

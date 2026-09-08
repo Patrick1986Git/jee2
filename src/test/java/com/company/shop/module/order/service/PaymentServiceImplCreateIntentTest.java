@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +30,7 @@ import com.company.shop.module.order.expiration.StripePaymentIntentGateway;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderItem;
 import com.company.shop.module.order.entity.Payment;
+import com.company.shop.module.order.entity.PaymentStatus;
 import com.company.shop.module.order.exception.PaymentAlreadyCompletedException;
 import com.company.shop.module.order.exception.PaymentProcessingException;
 import com.company.shop.module.order.exception.PaymentRecordNotFoundException;
@@ -164,6 +166,12 @@ class PaymentServiceImplCreateIntentTest {
 		verify(paymentRepository).save(paymentCaptor.capture());
 		assertThat(paymentCaptor.getValue().getProviderPaymentId()).isEqualTo("pi_123");
 		assertThat(paymentCaptor.getValue().getClientSecret()).isEqualTo("cs_123");
+		assertThat(paymentCaptor.getValue().getAmount()).isEqualByComparingTo("24.50");
+		assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.PENDING);
+		assertThat(meterRegistry.get("shop.payment_intent.total").tag("result", "created").counter().count())
+				.isEqualTo(1);
+		verify(paymentRepository, times(2)).findByOrderIdForUpdate(order.getId());
+		verify(orderRepository).findByIdForUpdate(order.getId());
 		verify(stripeGateway).create(order.getId(), order.getTotalAmount(), "order-payment-intent-" + order.getId());
 	}
 
