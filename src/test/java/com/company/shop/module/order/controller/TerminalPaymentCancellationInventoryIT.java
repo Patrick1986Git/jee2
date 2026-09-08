@@ -32,6 +32,7 @@ import com.company.shop.module.category.entity.Category;
 import com.company.shop.module.category.repository.CategoryRepository;
 import com.company.shop.module.order.dto.OrderCheckoutRequestDTO;
 import com.company.shop.module.order.dto.OrderResponseDTO;
+import com.company.shop.module.order.expiration.StripePaymentIntentGateway;
 import com.company.shop.module.order.entity.Order;
 import com.company.shop.module.order.entity.OrderStatus;
 import com.company.shop.module.order.entity.Payment;
@@ -52,9 +53,7 @@ import com.company.shop.persistence.support.PostgresContainerSupport;
 import com.stripe.model.Event;
 import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.PaymentIntent;
-import com.stripe.net.RequestOptions;
 import com.stripe.net.Webhook;
-import com.stripe.param.PaymentIntentCreateParams;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -100,6 +99,9 @@ class TerminalPaymentCancellationInventoryIT extends PostgresContainerSupport {
     @MockitoBean
     private CurrentUserFacade currentUserFacade;
 
+    @MockitoBean
+    private StripePaymentIntentGateway stripeGateway;
+
     @Test
     void handleStripeWebhook_shouldReleaseReservedInventoryWhenPaymentIntentIsTerminallyCanceled() throws Exception {
         Category category = categoryRepository.saveAndFlush(new Category(
@@ -121,13 +123,9 @@ class TerminalPaymentCancellationInventoryIT extends PostgresContainerSupport {
         when(providerIntent.getId()).thenReturn(PAYMENT_INTENT_ID);
         when(providerIntent.getClientSecret()).thenReturn("cs_terminal_inventory_cancellation");
 
-        OrderResponseDTO checkout;
-        try (MockedStatic<PaymentIntent> paymentIntentStatic = mockStatic(PaymentIntent.class)) {
-            paymentIntentStatic.when(() -> PaymentIntent.create(
-                    any(PaymentIntentCreateParams.class), any(RequestOptions.class))).thenReturn(providerIntent);
-            checkout = orderService.placeOrderFromCart(
-                    "terminal-cancellation-checkout", new OrderCheckoutRequestDTO(null, null));
-        }
+        when(stripeGateway.create(any(), any(), any())).thenReturn(providerIntent);
+        OrderResponseDTO checkout = orderService.placeOrderFromCart(
+                "terminal-cancellation-checkout", new OrderCheckoutRequestDTO(null, null));
 
         Order order = orderRepository.findById(checkout.id()).orElseThrow();
         Payment payment = paymentRepository.findByOrderId(order.getId()).orElseThrow();
