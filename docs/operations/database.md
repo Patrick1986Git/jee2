@@ -75,7 +75,7 @@ Java 21, and the repository's `postgres:18-alpine` server image. The following t
 | Hikari connection acquisition | Production must provide `DATABASE_CONNECTION_TIMEOUT_MILLISECONDS`. Hikari applies it only while `DataSource.getConnection()` waits for a pool entry. | SQL, a lock wait, or a transaction after the connection has been borrowed. |
 | JDBC/network | No PostgreSQL JDBC `socketTimeout`, `Statement.setQueryTimeout`, or `Connection.setNetworkTimeout` policy is configured. | With the driver defaults, application-side network and statement execution have no repository-owned deadline. |
 | SQL statement | No global JPA/Hibernate query timeout and no PostgreSQL `statement_timeout` are configured. | A slow plan, database resource wait, or blocked statement can retain a borrowed connection without a repository-owned bound. |
-| Lock wait | No general JPA/Hibernate lock timeout and no PostgreSQL `lock_timeout` are configured. One discount-code method has the historical hint described below. | Ordinary row/advisory lock acquisition is otherwise unbounded by repository configuration. |
+| Lock wait | No general JPA/Hibernate lock timeout and no PostgreSQL `lock_timeout` are configured. | Ordinary row/advisory lock acquisition is unbounded by repository configuration. |
 | Spring transaction | There is no `spring.transaction.default-timeout`, transaction-manager override, or `@Transactional(timeout=...)`. Read-only transactions differ only in the read-only hint, not duration. | Transaction completion and idle-in-transaction time. A Spring timeout, if later used, is not a forceful wall-clock cancellation guarantee for arbitrary blocked driver I/O. |
 | PostgreSQL idle transaction | No `idle_in_transaction_session_timeout` or `idle_session_timeout` is configured. | A session that is idle while its transaction remains open is not terminated by repository-owned policy. |
 
@@ -98,7 +98,7 @@ The production tree has the following explicit lock acquisition sites:
 | `OrderRepository.acquireCheckoutIdempotencyLock` | Transaction-scoped advisory lock serializes checkout by user and normalized idempotency key. | Blocking and potentially unbounded. The waiting request thread retains its Hikari connection. Replacing it with `pg_try_advisory_xact_lock` would turn serialization into an immediate failure/retry contract and is not correctness-equivalent. |
 | `CartRepository.findByUserIdWithItemsForUpdate` | Cart mutations and checkout snapshot serialization. | Normal short contention, but no configured upper bound. |
 | `ProductRepository.findByIdWithLock` | Checkout reservation, inventory restoration, product mutation, and review aggregate serialization. | Checkout/inventory serialization, potentially unbounded; checkout sorts product identifiers before acquiring multiple product locks to reduce deadlock risk. |
-| `DiscountCodeRepository.findByCodeIgnoreCase` | Serializes the discount usage check/update. | Historical positive JPA hint; effective PostgreSQL behavior is described below. |
+| `DiscountCodeRepository.findByCodeIgnoreCase` | Serializes the discount usage check/update. | Correctness-critical row serialization, potentially unbounded. |
 | `OrderRepository.findByIdForUpdate` | Payment convergence and reservation-expiration state transitions. | Correctness-critical row serialization, potentially unbounded. |
 | `PaymentRepository.findByOrderIdForUpdate` | Payment initialization and terminal webhook convergence. | Correctness-critical row serialization, potentially unbounded. |
 | `NotificationRepository.findByIdForUpdate` | Delivery finalization/failure after SMTP returns. | Short worker finalization contention, potentially unbounded. SMTP is outside this transaction. |
@@ -117,18 +117,18 @@ a claim that all other SQL is non-blocking.
 
 ### Discount-code timeout finding
 
-The `jakarta.persistence.lock.timeout = 3000` hint was introduced with the discount repository and has no accompanying
-test, design record, latency evidence, or API contract that establishes three seconds as a business requirement. It is
-therefore an unproven historical number and must not be copied to other locks.
+The former `jakarta.persistence.lock.timeout = 3000` hint was introduced with the discount repository and had no
+accompanying test, design record, latency evidence, or API contract that established three seconds as a business
+requirement. It was therefore dead, misleading configuration and has been removed.
 
 In the resolved Hibernate/PostgreSQL stack, a positive millisecond lock hint is carried in Hibernate's lock options,
 but PostgreSQL's dialect renders an ordinary `FOR UPDATE` for a positive value. It neither executes
 `SET LOCAL lock_timeout` nor creates a client timer, and it is distinct from `jakarta.persistence.query.timeout` and
-JDBC `Statement.setQueryTimeout`. The value therefore does **not** enforce a three-second PostgreSQL lock wait. Special
+JDBC `Statement.setQueryTimeout`. The value therefore did **not** enforce a three-second PostgreSQL lock wait. Special
 Hibernate lock modes such as no-wait and skip-locked can change SQL rendering, but that does not make an arbitrary
-positive JPA duration enforceable on this dialect. The hint remains documented rather than generalized or silently
-reinterpreted; changing/removing its public failure behavior requires a separately selected contract and PostgreSQL
-integration coverage.
+positive JPA duration enforceable on this dialect. The repository retains the pessimistic lock that serializes the
+discount usage check/update, while the runtime deployment owns the generic lock-wait duration. When configured for the
+runtime identity, PostgreSQL `lock_timeout` controls that wait on the server.
 
 ### Ownership decision
 
