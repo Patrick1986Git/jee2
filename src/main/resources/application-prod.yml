@@ -12,10 +12,11 @@ spring:
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
-    # Highly recommended: configure connection pool (Hikari) for production
+    # Per-replica capacity and acquisition bounds are deployment-owned and mandatory.
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: ${DATABASE_MAXIMUM_POOL_SIZE}
+      minimum-idle: ${DATABASE_MINIMUM_IDLE}
+      connection-timeout: ${DATABASE_CONNECTION_TIMEOUT_MILLISECONDS}
 
   # JPA & Hibernate: Production Settings
   # 'validate' ensures that no destructive schema changes occur.

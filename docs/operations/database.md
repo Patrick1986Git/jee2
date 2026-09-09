@@ -16,6 +16,55 @@ The host may separately run a system PostgreSQL instance on `localhost:5432`; Do
 
 The `dev` profile keeps Hibernate in `ddl-auto: validate`. Schema changes must come from Flyway, not Hibernate auto-DDL. Local Flyway uses the admin/bootstrap identity by default through `spring.flyway.url`, `spring.flyway.user`, and `spring.flyway.password`; the application datasource uses the least-privilege runtime identity.
 
+## Production connection capacity
+
+Production Hikari capacity is a deployment-owned contract. Every replica has one application Hikari pool, and production
+must supply `DATABASE_MAXIMUM_POOL_SIZE`, `DATABASE_MINIMUM_IDLE`, and
+`DATABASE_CONNECTION_TIMEOUT_MILLISECONDS`. The repository deliberately provides no production numeric fallback.
+Values must satisfy `maximumPoolSize > 0`, `minimumIdle >= 0`, `minimumIdle <= maximumPoolSize`, and HikariCP's
+250-millisecond minimum connection timeout; invalid values stop startup and identify only the property.
+
+Budget application connections database-wide rather than sizing one replica in isolation:
+
+```text
+simultaneously running replicas × DATABASE_MAXIMUM_POOL_SIZE
+```
+
+That product is only the application-pool portion of the budget. Reserve capacity for PostgreSQL administration and
+operational tooling, Flyway's unpooled lifecycle connection, database/platform requirements, and failures that require
+replacement connections. Count old and new replicas simultaneously during a rolling deployment. PostgreSQL
+`max_connections` is not wholly available to application pools. The deployment must derive its values from its database
+or proxy allowance, concurrency and transaction-duration evidence, rollout policy, and operational reserve; this
+repository owns none of those numbers.
+
+`DATABASE_MINIMUM_IDLE` is also per replica. A warm floor therefore consumes idle server connections as replicas and
+rollout overlap increase. HikariCP 7.0.2 uses `minimumIdle = maximumPoolSize` when minimum idle is omitted, producing a
+fixed-size pool, so production requires an explicit choice rather than accidentally inheriting that behavior. Zero is
+valid when the deployment chooses elastic creation; a positive warm floor requires deployment evidence.
+
+Connection acquisition waits at most `DATABASE_CONNECTION_TIMEOUT_MILLISECONDS`. At expiry Hikari throws a transient
+SQL connection exception and records a timeout metric; HTTP work, authentication lookups, scheduled workers, and the
+standard database health contributor all share this bound because they use the application pool. Choose it from the
+request, worker, and shutdown budgets. It is not a transaction timeout and must not be copied from SMTP/Stripe bounds
+or notification/reservation claim leases: those bound different operations and a complete workflow may acquire more
+than one connection in separate transactions.
+
+HikariCP 7.0.2 continues to own the unconfigured lifecycle defaults: 5-second validation timeout, 10-minute idle
+timeout, 30-minute maximum lifetime, 2-minute keepalive, and 1-millisecond initialization-failure timeout. The
+deployment must override relevant standard `spring.datasource.hikari.*` properties when a PostgreSQL service, network,
+or proxy imposes a shorter connection lifetime or different keepalive policy. In particular, introducing PgBouncer,
+RDS Proxy, or another intermediary requires a compatibility review; the repository assumes none of them and does not
+invent their timeout values. JDBC4 `Connection.isValid` is used when no connection test query is configured.
+
+Logical database consumers do not create additional application pools. JPA repositories and transactions, HTTP and
+ADMIN operations, the outbox worker, notification claim/finalization, reservation-expiration claim/finalization, and
+readiness `db` checks all borrow from the single application Hikari pool. Because production supplies an explicit
+Flyway URL and credentials, Spring Boot creates a separate unpooled `SimpleDriverDataSource` for migration lifecycle
+connections. Local role bootstrap and ownership-transfer scripts run `psql` outside the application JVM. Integration
+tests share their Testcontainers PostgreSQL server while each Spring test context creates its own test application pool;
+the test profile caps those pools at four with zero minimum idle. Docker Compose runs one optional development app
+service and separate PostgreSQL and one-shot role-bootstrap services; it does not define production topology.
+
 ## Production migration identity
 
 Production requires two distinct PostgreSQL login identities. `DATABASE_USERNAME` and `DATABASE_PASSWORD` configure the least-privilege runtime datasource. `FLYWAY_USER` and `FLYWAY_PASSWORD` configure the schema migration identity; `FLYWAY_URL` may select a dedicated migration endpoint and otherwise uses `DATABASE_URL`. None of the production Flyway credentials default to the runtime credentials. Missing migration credentials therefore stop startup rather than silently running DDL through the application identity.

@@ -72,6 +72,29 @@ The application also relies on Spring Boot's standard HTTP/JVM/process/data-sour
 contributors. Their names and labels are framework-owned rather than repository-defined; deployments should pin and
 review the framework version before treating those as a durable external contract.
 
+Spring Boot 4.1.1 automatically binds the single HikariCP 7.0.2 application datasource to Micrometer. Hikari publishes
+the following meters with its low-cardinality `pool` tag; Spring Boot additionally publishes the first four capacity
+gauges under `jdbc.connections.*` with datasource `name`:
+
+| Hikari meter | Type | Operational meaning |
+| --- | --- | --- |
+| `hikaricp.connections.active` | Gauge | Connections currently borrowed from the pool. |
+| `hikaricp.connections.idle` | Gauge | Established connections currently available. |
+| `hikaricp.connections.pending` | Gauge | Threads waiting to acquire a connection. |
+| `hikaricp.connections` | Gauge | Total established pool connections. |
+| `hikaricp.connections.max` / `hikaricp.connections.min` | Gauge | Effective per-replica configured ceiling and idle floor. |
+| `hikaricp.connections.acquire` | Timer | Successful connection acquisition latency. |
+| `hikaricp.connections.usage` | Timer | Time connections remain borrowed. |
+| `hikaricp.connections.creation` | Timer | Physical connection creation latency. |
+| `hikaricp.connections.timeout` | Counter | Acquisitions that reached `connectionTimeout`. |
+
+The generic gauges are `jdbc.connections.active`, `jdbc.connections.idle`, `jdbc.connections.max`, and
+`jdbc.connections.min`. No custom pool gauges are needed. Pending demand plus acquisition latency and timeouts reveals
+saturation pressure; usage and creation timing help distinguish long-held connections, slow creation, and capacity
+contention. These process-local signals must be aggregated with replica count and database/proxy telemetry for the
+database-wide budget. Do not attach SQL, database usernames, request/user/tenant identifiers, or arbitrary pool values
+as tags, and derive no alert threshold from the repository defaults.
+
 ## Asynchronous degradation and alert contract
 
 Backlog is observed through metrics, not health. A short backlog must not remove a replica from traffic, and a database
