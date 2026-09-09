@@ -52,6 +52,13 @@ springdoc:
 # Keep client/protocol forwarding metadata untrusted until that boundary is implemented.
 server:
   forward-headers-strategy: none
+  # Per-replica HTTP admission limits depend on deployment resources and are mandatory.
+  tomcat:
+    threads:
+      max: ${SERVER_TOMCAT_THREADS_MAX}
+    max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT}
+    connection-timeout: ${SERVER_TOMCAT_CONNECTION_TIMEOUT}
 
 # Production traffic routing must use readiness, while liveness deliberately
 # excludes shared dependencies to avoid restart loops during a database outage.

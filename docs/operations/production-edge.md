@@ -18,6 +18,12 @@ The production contract is therefore:
 - PostgreSQL is shared application state, but there is no shared rate-limit store and it must not be repurposed as one
   without a separately reviewed availability and capacity design.
 
+Rate limiting and application admission capacity are separate controls. The edge owns routing, any pre-application
+queue, connection reuse, and coarse abuse rejection. The deployment also selects the mandatory per-replica Tomcat
+worker, connection, accept-backlog, and request-read limits because they depend on that deployment's resources and
+topology; the repository requires their presence through native `server.tomcat.*` configuration. The complete
+queueing and overload contract is documented in [HTTP admission capacity and backpressure](./http-capacity.md).
+
 `application-prod.yml` explicitly sets `server.forward-headers-strategy: none`. Consequently, attacker-selected
 `Forwarded`, `X-Forwarded-For`, and `X-Real-IP` values are ordinary untrusted headers and are not used by Spring Boot to
 rewrite the request's peer address, scheme, host, or port. An internet caller can send those header names whenever an

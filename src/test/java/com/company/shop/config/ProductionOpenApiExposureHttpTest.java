@@ -87,7 +87,11 @@ import com.company.shop.security.jwt.JwtTokenProvider;
                 "stripe.public-key=pk_test_placeholder",
                 "stripe.network.connect-timeout=PT1S",
                 "stripe.network.read-timeout=PT2S",
-                "stripe.network.max-network-retries=0"
+                "stripe.network.max-network-retries=0",
+                "server.tomcat.threads.max=8",
+                "server.tomcat.max-connections=32",
+                "server.tomcat.accept-count=8",
+                "server.tomcat.connection-timeout=5s"
         })
 @ActiveProfiles("prod")
 @MockitoBean(types = {
