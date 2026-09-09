@@ -65,6 +65,112 @@ tests share their Testcontainers PostgreSQL server while each Spring test contex
 the test profile caps those pools at four with zero minimum idle. Docker Compose runs one optional development app
 service and separate PostgreSQL and one-shot role-bootstrap services; it does not define production topology.
 
+## SQL, lock-wait, and transaction boundedness
+
+The resolved runtime stack is Spring Boot 4.1.1, Hibernate ORM 7.4.5.Final, PostgreSQL JDBC 42.7.12, HikariCP 7.0.2,
+Java 21, and the repository's `postgres:18-alpine` server image. The following timeout layers are independent:
+
+| Layer | Current repository contract | What it does not bound |
+| --- | --- | --- |
+| Hikari connection acquisition | Production must provide `DATABASE_CONNECTION_TIMEOUT_MILLISECONDS`. Hikari applies it only while `DataSource.getConnection()` waits for a pool entry. | SQL, a lock wait, or a transaction after the connection has been borrowed. |
+| JDBC/network | No PostgreSQL JDBC `socketTimeout`, `Statement.setQueryTimeout`, or `Connection.setNetworkTimeout` policy is configured. | With the driver defaults, application-side network and statement execution have no repository-owned deadline. |
+| SQL statement | No global JPA/Hibernate query timeout and no PostgreSQL `statement_timeout` are configured. | A slow plan, database resource wait, or blocked statement can retain a borrowed connection without a repository-owned bound. |
+| Lock wait | No general JPA/Hibernate lock timeout and no PostgreSQL `lock_timeout` are configured. One discount-code method has the historical hint described below. | Ordinary row/advisory lock acquisition is otherwise unbounded by repository configuration. |
+| Spring transaction | There is no `spring.transaction.default-timeout`, transaction-manager override, or `@Transactional(timeout=...)`. Read-only transactions differ only in the read-only hint, not duration. | Transaction completion and idle-in-transaction time. A Spring timeout, if later used, is not a forceful wall-clock cancellation guarantee for arbitrary blocked driver I/O. |
+| PostgreSQL idle transaction | No `idle_in_transaction_session_timeout` or `idle_session_timeout` is configured. | A session that is idle while its transaction remains open is not terminated by repository-owned policy. |
+
+PostgreSQL JDBC cancellation is best effort: a JDBC query timeout schedules a separate cancel request, while
+`socketTimeout` closes a connection after a socket read receives no data. Those are different failure and recovery
+mechanisms and neither is supplied here. PostgreSQL `statement_timeout` measures statement execution on the server;
+`lock_timeout` applies while acquiring PostgreSQL locks (including advisory locks) and is useful only when shorter than
+the applicable statement timeout. A server/session timeout cancels the statement and leaves an explicit transaction
+failed until rollback; transaction-scoped advisory locks are released when that transaction ends, or when the session
+ends. Merely terminating an HTTP client does not prove that the servlet thread or JDBC statement has been cancelled.
+Normal transaction rollback releases locks; forced JVM/session termination causes PostgreSQL to release them when it
+detects the disconnected session.
+
+### Blocking-lock inventory
+
+The production tree has the following explicit lock acquisition sites:
+
+| Site | Purpose and contention class | Current wait behavior |
+| --- | --- | --- |
+| `OrderRepository.acquireCheckoutIdempotencyLock` | Transaction-scoped advisory lock serializes checkout by user and normalized idempotency key. | Blocking and potentially unbounded. The waiting request thread retains its Hikari connection. Replacing it with `pg_try_advisory_xact_lock` would turn serialization into an immediate failure/retry contract and is not correctness-equivalent. |
+| `CartRepository.findByUserIdWithItemsForUpdate` | Cart mutations and checkout snapshot serialization. | Normal short contention, but no configured upper bound. |
+| `ProductRepository.findByIdWithLock` | Checkout reservation, inventory restoration, product mutation, and review aggregate serialization. | Checkout/inventory serialization, potentially unbounded; checkout sorts product identifiers before acquiring multiple product locks to reduce deadlock risk. |
+| `DiscountCodeRepository.findByCodeIgnoreCase` | Serializes the discount usage check/update. | Historical positive JPA hint; effective PostgreSQL behavior is described below. |
+| `OrderRepository.findByIdForUpdate` | Payment convergence and reservation-expiration state transitions. | Correctness-critical row serialization, potentially unbounded. |
+| `PaymentRepository.findByOrderIdForUpdate` | Payment initialization and terminal webhook convergence. | Correctness-critical row serialization, potentially unbounded. |
+| `NotificationRepository.findByIdForUpdate` | Delivery finalization/failure after SMTP returns. | Short worker finalization contention, potentially unbounded. SMTP is outside this transaction. |
+| `ReservationExpirationWorkRepository.findByIdForUpdate` | Claim finalization, failure, recovery, and ADMIN operations. | Worker/admin contention, potentially unbounded. |
+| `OutboxEventRepository.findByIdForManualRequeueUpdate` | ADMIN manual requeue. | Admin/manual-operation contention, potentially unbounded. |
+| `OutboxEventRepository.findDuePendingByIdForUpdateSkipLocked` | Outbox claim/failure coordination. | `FOR UPDATE SKIP LOCKED` deliberately does not wait for a row already locked by another worker. |
+| `ReservationExpirationWorkRepository.findClaimableForUpdate` | Reservation-expiration claim coordination. | `FOR UPDATE SKIP LOCKED` deliberately avoids row-lock waits. |
+| `NotificationRepository` claim query | Notification delivery claim coordination. | `FOR UPDATE SKIP LOCKED` deliberately avoids row-lock waits. |
+| `ProductCatalogFacadeImpl.restoreInventory` | Explicit JDBC `SELECT stock ... FOR UPDATE` before inventory restoration. | Inventory serialization, potentially unbounded. |
+
+`StripeWebhookEventRepository.registerIfAbsent` is the only native modifying query outside those repositories. Its
+`INSERT ... ON CONFLICT DO NOTHING` has no explicit lock clause, but PostgreSQL uniqueness/index conflict resolution can
+still wait for a concurrent transaction. Ordinary ORM inserts, updates, deletes, foreign-key checks, and unique checks
+can likewise wait even though no lock syntax appears in repository source. Consequently the explicit-lock list is not
+a claim that all other SQL is non-blocking.
+
+### Discount-code timeout finding
+
+The `jakarta.persistence.lock.timeout = 3000` hint was introduced with the discount repository and has no accompanying
+test, design record, latency evidence, or API contract that establishes three seconds as a business requirement. It is
+therefore an unproven historical number and must not be copied to other locks.
+
+In the resolved Hibernate/PostgreSQL stack, a positive millisecond lock hint is carried in Hibernate's lock options,
+but PostgreSQL's dialect renders an ordinary `FOR UPDATE` for a positive value. It neither executes
+`SET LOCAL lock_timeout` nor creates a client timer, and it is distinct from `jakarta.persistence.query.timeout` and
+JDBC `Statement.setQueryTimeout`. The value therefore does **not** enforce a three-second PostgreSQL lock wait. Special
+Hibernate lock modes such as no-wait and skip-locked can change SQL rendering, but that does not make an arbitrary
+positive JPA duration enforceable on this dialect. The hint remains documented rather than generalized or silently
+reinterpreted; changing/removing its public failure behavior requires a separately selected contract and PostgreSQL
+integration coverage.
+
+### Ownership decision
+
+The audit selects **Outcome B** for generic statement, lock-wait, transaction, and idle-in-transaction bounds. Safe
+values depend on measured query/lock latency, request and worker budgets, database performance, rollout/shutdown policy,
+and operational recovery. The repository intentionally does not invent universal numeric defaults. The checkout
+advisory lock and each row lock remain repository-owned correctness mechanisms, but their generic wait durations do
+not become application correctness numbers. Existing `SKIP LOCKED` coordination remains non-blocking and needs no lock
+timeout hint.
+
+Prefer PostgreSQL role or database defaults scoped to the least-privilege runtime identity when a deployment adopts
+`statement_timeout`, `lock_timeout`, and `idle_in_transaction_session_timeout`. This covers ORM and native SQL without
+high-cardinality per-query configuration and keeps the policy visible to database operators. Validate the effective
+values on a fresh runtime session during deployment. JDBC URL `options` or Hikari connection-init SQL can also scope a
+runtime-session policy, but they couple operational policy to application configuration and should not be combined
+with role defaults without a clear precedence rule. Per-query hints are reserved for a proven, query-specific contract.
+
+Do not apply runtime timeouts to `FLYWAY_USER`, the Flyway URL, the PostgreSQL administrative identity, role bootstrap,
+ownership transfer, backup/restore, or reviewed maintenance sessions. Migrations and privileged operations have
+different duration and recovery requirements. Runtime/Flyway identity separation is therefore also the timeout-policy
+boundary; database-wide defaults are unsafe unless they explicitly exclude those identities.
+
+### Failure and observability contract
+
+PostgreSQL reports statement-timeout cancellation as SQLSTATE `57014` (`query_canceled`) and lock-timeout cancellation
+as SQLSTATE `55P03` (`lock_not_available`). Terminating an idle-in-transaction session reports SQLSTATE `25P03` and is
+a connection-ending failure rather than a normal application result. Depending on the path,
+the JDBC error is converted through Hibernate/JPA and Spring persistence exception translation. The current global
+handler has no timeout-specific mapping, so an uncaught database timeout follows the sanitized unexpected-error 500
+contract; it is not the existing optimistic-lock 409. No 409 or 503 contract is inferred merely by enabling an
+operational timeout. Logs and responses must continue to omit raw SQL, lock keys, database identities, connection
+strings, and driver messages.
+
+Standard Hikari/Micrometer signals already distinguish acquisition pressure (`hikaricp.connections.pending`,
+`hikaricp.connections.acquire`, and `hikaricp.connections.timeout`) from long borrowed usage
+(`hikaricp.connections.usage`). They cannot identify whether usage time was query execution, a row/advisory lock wait,
+application work inside a transaction, or commit/rollback. PostgreSQL `pg_stat_activity`, `wait_event_type`,
+`wait_event`, transaction age, database logs, and timeout SQLSTATEs provide that database-side distinction. Spring does
+not currently publish a dedicated query-, lock-, or transaction-timeout counter. No custom SQL metric or
+high-cardinality tag is justified until a concrete repository-owned timeout contract exists, and this audit defines no
+alert threshold.
+
 ## Production migration identity
 
 Production requires two distinct PostgreSQL login identities. `DATABASE_USERNAME` and `DATABASE_PASSWORD` configure the least-privilege runtime datasource. `FLYWAY_USER` and `FLYWAY_PASSWORD` configure the schema migration identity; `FLYWAY_URL` may select a dedicated migration endpoint and otherwise uses `DATABASE_URL`. None of the production Flyway credentials default to the runtime credentials. Missing migration credentials therefore stop startup rather than silently running DDL through the application identity.
