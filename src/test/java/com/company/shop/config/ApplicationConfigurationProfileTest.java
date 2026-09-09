@@ -61,6 +61,20 @@ class ApplicationConfigurationProfileTest {
     }
 
     @Test
+    void prodConfiguration_shouldRequireDeploymentOwnedTomcatAdmissionCapacity() {
+        Properties properties = loadProperties("application-prod.yml");
+
+        assertThat(properties.getProperty("server.tomcat.threads.max"))
+                .isEqualTo("${SERVER_TOMCAT_THREADS_MAX}");
+        assertThat(properties.getProperty("server.tomcat.max-connections"))
+                .isEqualTo("${SERVER_TOMCAT_MAX_CONNECTIONS}");
+        assertThat(properties.getProperty("server.tomcat.accept-count"))
+                .isEqualTo("${SERVER_TOMCAT_ACCEPT_COUNT}");
+        assertThat(properties.getProperty("server.tomcat.connection-timeout"))
+                .isEqualTo("${SERVER_TOMCAT_CONNECTION_TIMEOUT}");
+    }
+
+    @Test
     void baseConfiguration_shouldDefineBoundedGracefulShutdown() {
         Properties properties = loadProperties("application.yml");
 

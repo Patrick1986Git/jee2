@@ -95,6 +95,16 @@ contention. These process-local signals must be aggregated with replica count an
 database-wide budget. Do not attach SQL, database usernames, request/user/tenant identifiers, or arbitrary pool values
 as tags, and derive no alert threshold from the repository defaults.
 
+The running embedded Tomcat connector is covered by standard Micrometer meters: `tomcat.threads.busy`,
+`tomcat.threads.current`, `tomcat.threads.config.max`, `tomcat.connections.current`,
+`tomcat.connections.keepalive.current`, and `tomcat.connections.config.max`. Standard HTTP observations publish
+`http.server.requests` count and duration, while connector-wide request, error, and byte totals/timing are available
+under `tomcat.global.*`. There is no repository-defined rejection gauge and no standard application meter that fully
+observes an OS accept-backlog overflow. Diagnose overload by correlating edge/host connection evidence, these Tomcat
+meters, HTTP outcomes, readiness, and the Hikari meters above. See
+[HTTP admission capacity and backpressure](./http-capacity.md) for queue and failure semantics. No duplicate gauges or
+numeric alert thresholds are defined.
+
 ## Asynchronous degradation and alert contract
 
 Backlog is observed through metrics, not health. A short backlog must not remove a replica from traffic, and a database

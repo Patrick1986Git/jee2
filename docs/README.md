@@ -22,6 +22,7 @@ This `docs/` folder contains practical documentation that is currently grounded 
 ## Operations
 - [`operations/local-development.md`](./operations/local-development.md) — local PostgreSQL setup, profiles, startup, and smoke checks.
 - [`operations/production-edge.md`](./operations/production-edge.md) — production edge trust boundary and public-authentication abuse controls.
+- [`operations/http-capacity.md`](./operations/http-capacity.md) — production Tomcat admission, queueing, downstream-capacity, overload, and metric ownership.
 - [`operations/jwt-key-rotation.md`](./operations/jwt-key-rotation.md) — bounded JWT signing-key rollover, retirement, rollback, and emergency-compromise procedure.
 - [`operations/database.md`](./operations/database.md) — PostgreSQL schema ownership and database conventions.
 - [`operations/data-retention.md`](./operations/data-retention.md) — operational-record retention classes, correctness boundaries, and prerequisites for future purge or archival.

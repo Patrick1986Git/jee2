@@ -36,7 +36,13 @@ import jakarta.servlet.http.HttpServletResponse;
 @SpringBootTest(
 		classes = ProductionFallbackErrorHttpTest.TestApplication.class,
 		webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-		properties = "management.endpoint.health.validate-group-membership=false")
+		properties = {
+			"management.endpoint.health.validate-group-membership=false",
+			"server.tomcat.threads.max=8",
+			"server.tomcat.max-connections=32",
+			"server.tomcat.accept-count=8",
+			"server.tomcat.connection-timeout=5s"
+		})
 @ActiveProfiles("prod")
 class ProductionFallbackErrorHttpTest {
 

@@ -29,6 +29,12 @@ For replacement of replica A while replica B remains available, the deployment p
 
 Spring can expose state and drain requests already admitted to Tomcat, but it cannot remove A from an external routing table. The deployment must account for its own polling interval and deregistration latency in addition to the application's multi-phase lifecycle allowance. Authenticated reads, checkout, order mutations, payment-intent creation, webhooks, and ADMIN commands all use the same server drain boundary; there is no endpoint-specific shutdown bypass.
 
+Production Tomcat worker, connection, accept-backlog, and request-read limits are deployment-owned and mandatory as
+described in [HTTP admission capacity and backpressure](./http-capacity.md). Graceful shutdown pauses new connector
+admission; work already accepted or executing still consumes the 30-second web phase. Connector and OS queues do not
+extend that phase, so excessive connection or accept queues can retain clients and undermine a predictable practical
+drain even though Spring still bounds the phase.
+
 ## Scheduled workers
 
 Spring's auto-configured scheduler is a lifecycle-managed `ThreadPoolTaskScheduler`. On context close its early-shutdown signal stops accepting/starting scheduled work, but does not itself prove that a currently executing invocation has completed. The scheduler's coordinated stop occurs later, in phase `1073741823`, and can wait up to that phase's separate 30-second timeout for the invocation. It does not enable `spring.task.scheduling.shutdown.await-termination`: enabling that mode would defer scheduler shutdown and can allow scheduled triggers to continue during later context-close processing. If the scheduler phase expires, executor destruction interrupts remaining work.
